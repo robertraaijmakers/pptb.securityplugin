@@ -1,22 +1,36 @@
 {
-  "name": "@powerplatform/security-roles",
+  "name": "@robertraaijmakers/pptb-securityplugin",
   "version": "0.1.0",
   "displayName": "Security Roles Explorer",
   "description": "Be fully in control of your security by quickly viewing and managing which security roles give access to which tables. And who is assigned which security role.",
   "author": "Robert Raaijmakers",
+  "contributors": [
+    {
+      "name": "Robert Raaijmakers",
+      "url": "https://github.com/robertraaijmakers"
+    }
+  ],
   "license": "MIT",
   "main": "dist/index.html",
   "keywords": ["powerplatform", "dataverse", "toolbox", "security"],
+  "homepage": "https://robertraaijmakers.github.io/pptb.securityplugin/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/robertraaijmakers/pptb-securityplugin/"
+    "url": "https://github.com/robertraaijmakers/pptb.securityplugin/"
   },
+  "configurations": {
+    "repository": "https://github.com/robertraaijmakers/pptb.securityplugin/",
+    "website": "https://robertraaijmakers.github.io/pptb.securityplugin/",
+    "readmeUrl": "https://raw.githubusercontent.com/robertraaijmakers/pptb.securityplugin/main/README.md"
+  },
+  "files": ["dist/**", "README.md", "docs/**"],
   "scripts": {
     "build": "npm run build:bundle && npm run build:assets",
     "build:bundle": "esbuild app.ts --bundle --sourcemap --outdir=dist",
     "build:assets": "mkdir -p dist && cp index.html styles.css dist/",
     "build:watch": "esbuild app.ts --bundle --sourcemap --outdir=dist --watch",
-    "finalize-package": "pptb finalize"
+    "finalize-package": "pptb finalize",
+    "validate:publish": "node scripts/validate-publish.js"
   },
   "devDependencies": {
     "@pptb/types": "1.0.19-beta.3",
