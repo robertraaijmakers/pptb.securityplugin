@@ -74,6 +74,10 @@ if (!fileExists("README.md")) {
   fail("README.md missing.");
 }
 
+if (!fileExists("npm-shrinkwrap.json")) {
+  fail("npm-shrinkwrap.json missing. Run npm run finalize-package.");
+}
+
 if (process.exitCode) {
   process.exit(process.exitCode);
 } else {
