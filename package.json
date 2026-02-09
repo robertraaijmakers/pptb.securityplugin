@@ -39,6 +39,8 @@
     "build:watch": "esbuild src/app.ts --bundle --sourcemap --outdir=dist --watch",
     "finalize-package": "node scripts/finalize-package.js",
     "validate:publish": "node scripts/validate-publish.js",
+    "prepare:beta": "npm run build && npm run finalize-package && npm run version:beta",
+    "prepare:stable": "npm run build && npm run finalize-package && npm run version:stable",
     "version:beta": "npm version prerelease --preid beta",
     "version:stable": "npm version patch",
     "publish:beta": "npm publish --access public --tag beta",

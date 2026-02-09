@@ -47,6 +47,7 @@ body.theme-dark .tab-panel {
 
 body.theme-dark select,
 body.theme-dark .filter-select,
+body.theme-dark .filter-input,
 body.theme-dark .multi-select-button,
 body.theme-dark .multi-select-menu,
 body.theme-dark .btn,
@@ -791,7 +792,7 @@ body.theme-dark .chart-empty {
 }
 
 .table.hidden {
-  visibility: hidden;
+  display: none;
 }
 
 .table {
@@ -902,6 +903,15 @@ body.theme-dark .chart-empty {
   font-size: 12px;
   text-transform: none;
   letter-spacing: 0;
+}
+
+.filter-input {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 12px;
 }
 
 .table tbody td {

@@ -3,6 +3,7 @@ export const UI_TEXT = {
   loadingRolesMetadata: "Loading roles and metadata",
   loadingRolePrivileges: "Loading role privileges",
   loadingRefreshingPrivileges: "Refreshing role privileges",
+  loadingApplyingChanges: "Applying privilege changes",
   loadingDashboardData: "Loading dashboard data",
   loadingDashboardRolesTeams: "Loading roles and teams",
   loadingDashboardPeople: "Loading users, business units, and team memberships",
@@ -54,10 +55,6 @@ export const NOTIFICATIONS = {
   updateFailed: {
     title: "Update failed",
     body: "Failed to apply privilege updates. See console for details.",
-  },
-  updated: {
-    title: "Privileges updated",
-    body: "Your changes have been queued for update.",
   },
   cacheFailed: {
     title: "Cache failed",
@@ -125,14 +122,6 @@ export function formatApplyingChanges(count: number): string {
 
 export function formatMissingPrivilegeId(entityLogicalName: string, privilege: string): string {
   return `Missing privilege ID for ${entityLogicalName}:${privilege}`;
-}
-
-export function formatQueuedPrivilegeChange(
-  privilege: string,
-  entityLogicalName: string,
-  level: string,
-): string {
-  return `Queued ${privilege} change for ${entityLogicalName}: ${level}`;
 }
 
 export function formatNoPrivilegesForRole(roleName: string): string {

@@ -5,6 +5,15 @@ import { BusinessUnitSummary, DashboardUser, TeamMembership } from "../types/das
 
 export const dataverseAPI = (window as any).dataverseAPI;
 
+function buildPrivilegeReference(privilegeId: string): string {
+  const apiEndpoint = (dataverseAPI as any)?.apiEndpoint as string | undefined;
+  if (!apiEndpoint) {
+    return `privileges(${privilegeId})`;
+  }
+  const separator = apiEndpoint.endsWith("/") ? "" : "/";
+  return `${apiEndpoint}${separator}privileges(${privilegeId})`;
+}
+
 export async function queryAll(odataQuery: string) {
   const all: any[] = [];
   let response = await dataverseAPI.queryData(odataQuery);
@@ -166,6 +175,40 @@ export async function retrieveRolePrivileges(roleId: string) {
   const query = `RetrieveRolePrivilegesRole(RoleId=${roleId})`;
   const response = await dataverseAPI.queryData(query);
   return response?.RolePrivileges ?? response?.rolePrivileges ?? response?.value ?? [];
+}
+
+export async function addPrivilegesToRole(
+  roleId: string,
+  privileges: Array<{ PrivilegeId: string; Depth: string; PrivilegeName?: string }>,
+) {
+  if (privileges.length === 0) {
+    return;
+  }
+  await dataverseAPI.execute({
+    entityName: "role",
+    entityId: roleId,
+    operationName: "AddPrivilegesRole",
+    operationType: "action",
+    parameters: {
+      Privileges: privileges,
+    },
+  });
+}
+
+export async function removePrivilegesFromRole(roleId: string, privilegeId: string) {
+  if (!privilegeId) {
+    return;
+  }
+  const privilegeReference = buildPrivilegeReference(privilegeId);
+  await dataverseAPI.execute({
+    entityName: "role",
+    entityId: roleId,
+    operationName: "RemovePrivilegeRole",
+    operationType: "action",
+    parameters: {
+      Privilege: privilegeReference,
+    },
+  });
 }
 
 export async function associateRoleToUser(userId: string, roleId: string) {

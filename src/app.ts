@@ -18,6 +18,8 @@ import {
   loadUserRoleAssignments,
   loadTeamRoleAssignments,
   resolveRoleForBusinessUnit,
+  addPrivilegesToRole,
+  removePrivilegesFromRole,
   associateRoleToUser,
   disassociateRoleFromUser,
   associateRoleToTeam,
@@ -56,7 +58,6 @@ import {
   formatNoPrivilegesForRole,
   formatPrivilegesForRoleTitle,
   formatPrivilegesForTableTitle,
-  formatQueuedPrivilegeChange,
   formatRoleAssignmentLogRolesForTeam,
   formatRoleAssignmentLogRolesForUser,
   formatRoleAssignmentLogTeams,
@@ -141,6 +142,7 @@ const state = {
     direction: "asc" as AssignmentSortDirection,
   },
   assignmentFilter: "" as "" | "assigned" | "not-assigned",
+  assignmentSearch: "",
   sort: {
     column: "label" as SortColumn,
     direction: "asc" as SortDirection,
@@ -202,6 +204,7 @@ const elements = {
     document.querySelectorAll("[data-assign-sort]"),
   ) as HTMLButtonElement[],
   assignmentFilterAssigned: document.getElementById("assignment-filter-assigned") as HTMLSelectElement,
+  assignmentSearch: document.getElementById("assignment-search") as HTMLInputElement,
   controlsPrivileges: document.getElementById("controls-privileges") as HTMLDivElement,
   controlsAssignments: document.getElementById("controls-assignments") as HTMLDivElement,
   controlsDashboard: document.getElementById("controls-dashboard") as HTMLDivElement,
@@ -672,6 +675,19 @@ function applyAssignmentSortAndFilter(items: AssignmentItem[]) {
     if (state.assignmentFilter === "not-assigned") {
       return !item.assigned;
     }
+    if (state.assignmentSearch) {
+      const rawTerm = state.assignmentSearch.toLowerCase();
+      const term = rawTerm.replace(/\*/g, "").trim();
+      if (term) {
+        const labelMatch = item.label.toLowerCase().includes(term);
+        const subLabelMatch = item.subLabel
+          ? item.subLabel.toLowerCase().includes(term)
+          : false;
+        if (!labelMatch && !subLabelMatch) {
+          return false;
+        }
+      }
+    }
     return true;
   });
 
@@ -1063,7 +1079,6 @@ function renderPrivilegeTable() {
         const level = select.value as PrivilegeLevel;
         const isPending = updatePendingChange(roleId, row.entityLogicalName, privilege, level);
         setPendingClass(select, isPending);
-        logMessage(formatQueuedPrivilegeChange(privilege, row.entityLogicalName, level));
       });
       select.disabled = !isRoleMode && !row.roleId;
       applyLevelClass(select, select.value as PrivilegeLevel);
@@ -1242,18 +1257,18 @@ function mapPrivilegeLevelFromDepth(depth: unknown): PrivilegeLevel {
   return "none";
 }
 
-function mapPrivilegeDepth(level: PrivilegeLevel): number {
+function mapPrivilegeDepthLabel(level: PrivilegeLevel): string {
   switch (level) {
     case "user":
-      return 1;
+      return "Basic";
     case "businessUnit":
-      return 2;
+      return "Local";
     case "parentChild":
-      return 4;
+      return "Deep";
     case "organization":
-      return 8;
+      return "Global";
     default:
-      return 0;
+      return "None";
   }
 }
 
@@ -2693,7 +2708,10 @@ async function applyChanges() {
 
   logMessage(formatApplyingChanges(state.pendingChanges.length));
   const removesByRole = new Map<string, string[]>();
-  const addsByRole = new Map<string, Array<{ PrivilegeId: string; Depth: number }>>();
+  const addsByRole = new Map<
+    string,
+    Array<{ PrivilegeId: string; Depth: string; PrivilegeName?: string }>
+  >();
 
   for (const change of state.pendingChanges) {
     const privilegeId = state.privilegeIdByKey.get(`${change.entityLogicalName}:${change.privilege}`);
@@ -2712,44 +2730,48 @@ async function applyChanges() {
     if (currentLevel === change.level) {
       continue;
     }
-    if (currentLevel !== "none") {
+    if (change.level === "none") {
       if (!removesByRole.has(change.roleId)) {
         removesByRole.set(change.roleId, []);
       }
       removesByRole.get(change.roleId)!.push(privilegeId);
-    }
-    if (change.level !== "none") {
+    } else {
       if (!addsByRole.has(change.roleId)) {
         addsByRole.set(change.roleId, []);
       }
+      const privilegeInfo = state.privilegeInfoById.get(privilegeId);
       addsByRole.get(change.roleId)!.push({
         PrivilegeId: privilegeId,
-        Depth: mapPrivilegeDepth(change.level),
+        Depth: mapPrivilegeDepthLabel(change.level),
+        PrivilegeName: privilegeInfo?.name,
       });
     }
   }
 
+  const totalRemoveCalls = Array.from(removesByRole.values()).reduce(
+    (total, privilegeIds) => total + privilegeIds.length,
+    0,
+  );
+  const totalAddCalls = addsByRole.size;
+  const totalCalls = totalRemoveCalls + totalAddCalls;
+  let completedCalls = 0;
+
+  setLoading(true, UI_TEXT.loadingApplyingChanges);
+  updateLoadingProgress(0, totalCalls, UI_TEXT.loadingApplyingChanges);
+
   try {
     for (const [roleId, privilegeIds] of removesByRole) {
-      await dataverseAPI.execute({
-        operationName: "RemovePrivilegesRole",
-        operationType: "action",
-        parameters: {
-          RoleId: roleId,
-          PrivilegeIds: privilegeIds,
-        },
-      });
+      for (const privilegeId of privilegeIds) {
+        await removePrivilegesFromRole(roleId, privilegeId);
+        completedCalls += 1;
+        updateLoadingProgress(completedCalls, totalCalls, UI_TEXT.loadingApplyingChanges);
+      }
     }
 
     for (const [roleId, privileges] of addsByRole) {
-      await dataverseAPI.execute({
-        operationName: "AddPrivilegesRole",
-        operationType: "action",
-        parameters: {
-          RoleId: roleId,
-          Privileges: privileges,
-        },
-      });
+      await addPrivilegesToRole(roleId, privileges);
+      completedCalls += 1;
+      updateLoadingProgress(completedCalls, totalCalls, UI_TEXT.loadingApplyingChanges);
     }
 
     for (const change of state.pendingChanges) {
@@ -2769,17 +2791,13 @@ async function applyChanges() {
       duration: 3500,
     });
     return;
+  } finally {
+    setLoading(false);
   }
 
   state.pendingChanges = [];
-  await toolboxAPI.utils.showNotification({
-    title: NOTIFICATIONS.updated.title,
-    body: NOTIFICATIONS.updated.body,
-    type: "success",
-    duration: 2500,
-  });
   updatePendingUi();
-  renderPrivilegeTable();
+  await refreshPrivilegeView();
 }
 
 async function refreshData() {
@@ -3089,6 +3107,12 @@ function wireEvents() {
     elements.assignmentFilterAssigned.addEventListener("change", () => {
       state.assignmentFilter =
         (elements.assignmentFilterAssigned.value as "" | "assigned" | "not-assigned") || "";
+      renderAssignmentTable(state.assignmentItems);
+    });
+  }
+  if (elements.assignmentSearch) {
+    elements.assignmentSearch.addEventListener("input", () => {
+      state.assignmentSearch = elements.assignmentSearch.value.trim();
       renderAssignmentTable(state.assignmentItems);
     });
   }
