@@ -1,0 +1,26 @@
+{
+  "name": "@powerplatform/security-roles",
+  "version": "0.1.0",
+  "displayName": "Security Roles Explorer",
+  "description": "Be fully in control of your security by quickly viewing and managing which security roles give access to which tables. And who is assigned which security role.",
+  "author": "Robert Raaijmakers",
+  "license": "MIT",
+  "main": "dist/index.html",
+  "keywords": ["powerplatform", "dataverse", "toolbox", "security"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/robertraaijmakers/pptb-securityplugin/"
+  },
+  "scripts": {
+    "build": "npm run build:bundle && npm run build:assets",
+    "build:bundle": "esbuild app.ts --bundle --sourcemap --outdir=dist",
+    "build:assets": "mkdir -p dist && cp index.html styles.css dist/",
+    "build:watch": "esbuild app.ts --bundle --sourcemap --outdir=dist --watch",
+    "finalize-package": "pptb finalize"
+  },
+  "devDependencies": {
+    "@pptb/types": "1.0.19-beta.3",
+    "esbuild": "^0.20.2",
+    "typescript": "^5.4.5"
+  }
+}

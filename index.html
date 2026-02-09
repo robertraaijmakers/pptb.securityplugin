@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Advanced Security Roles Explorer</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="header">
+        <div>
+          <h1>Advanced Security Roles Explorer</h1>
+          <p class="subtitle">Be fully in control of your security by quickly viewing and managing which security roles give access to which tables. And who is assigned which security role.</p>
+        </div>
+        <div class="header-actions">
+          <nav class="tabs">
+            <button class="tab-button active" data-tab="privileges">Edit security roles</button>
+            <button class="tab-button" data-tab="assignments">Assign security roles</button>
+          </nav>
+          <div id="connection-badge" class="badge">Not connected</div>
+          <button type="button" id="theme-toggle" class="btn theme-toggle" aria-label="Toggle theme">
+            <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="4"></circle>
+              <line x1="12" y1="2" x2="12" y2="5"></line>
+              <line x1="12" y1="19" x2="12" y2="22"></line>
+              <line x1="2" y1="12" x2="5" y2="12"></line>
+              <line x1="19" y1="12" x2="22" y2="12"></line>
+              <line x1="4.2" y1="4.2" x2="6.4" y2="6.4"></line>
+              <line x1="17.6" y1="17.6" x2="19.8" y2="19.8"></line>
+              <line x1="4.2" y1="19.8" x2="6.4" y2="17.6"></line>
+              <line x1="17.6" y1="6.4" x2="19.8" y2="4.2"></line>
+            </svg>
+            <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M21 14.2A8 8 0 0 1 9.8 3a9 9 0 1 0 11.2 11.2z" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <section class="controls">
+        <div id="controls-privileges" class="controls-group">
+          <div class="control">
+            <label for="filter-mode">Filter mode</label>
+            <select id="filter-mode">
+              <option value="role">By role</option>
+              <option value="entity">By entity</option>
+            </select>
+          </div>
+          <div class="control" id="role-select-control">
+            <label for="role-select">Security role</label>
+            <select id="role-select"></select>
+          </div>
+          <div class="control" id="entity-select-control">
+            <label for="entity-select">Entity</label>
+            <select id="entity-select"></select>
+          </div>
+          <div class="control" id="rights-filter-control">
+            <label for="rights-filter">Rights</label>
+            <select id="rights-filter">
+              <option value="all">Show all</option>
+              <option value="without">Show all without rights</option>
+              <option value="with">Show all with rights</option>
+            </select>
+          </div>
+          <div class="control role-filter" id="role-filter-control">
+            <label>Role filter</label>
+            <div class="multi-select" id="role-filter">
+              <button type="button" class="multi-select-button" id="role-filter-button">
+                All roles
+              </button>
+              <div class="multi-select-menu hidden" id="role-filter-menu">
+                <div class="multi-select-actions">
+                  <button type="button" class="link-button" id="role-filter-all">Select all</button>
+                  <button type="button" class="link-button" id="role-filter-none">Clear</button>
+                </div>
+                <div class="multi-select-list" id="role-filter-list"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="controls-assignments" class="controls-group hidden">
+          <div class="control">
+            <label for="assignment-mode">View</label>
+            <select id="assignment-mode">
+              <option value="role">Role -> Users</option>
+              <option value="user">User -> Roles</option>
+            </select>
+          </div>
+          <div class="control" id="assignment-role-control">
+            <label for="assignment-role-select">Security role</label>
+            <select id="assignment-role-select"></select>
+          </div>
+          <div class="control" id="assignment-user-control">
+            <label for="assignment-user-select">User</label>
+            <select id="assignment-user-select"></select>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-privileges" class="panel tab-panel">
+        <div class="panel-header">
+          <h2 id="table-title">Privileges</h2>
+          <div class="panel-actions">
+            <button id="undo-btn" class="btn">Undo changes</button>
+            <button id="apply-btn" class="btn">Apply changes</button>
+            <span id="pending-count" class="pending-count hidden">0</span>
+          </div>
+        </div>
+        <div id="table-loading" class="table-loading hidden">
+          <div class="loading-card">
+            <div class="loading-title">Loading privileges</div>
+            <div class="loading-progress">
+              <div id="loading-bar" class="loading-bar"></div>
+            </div>
+            <div id="loading-text" class="loading-text">Preparing...</div>
+          </div>
+        </div>
+        <table class="table" id="privileges-table">
+          <thead>
+            <tr>
+              <th>
+                <button class="sort-button" data-sort="label">Entity / Role</button>
+              </th>
+              <th>Ownership</th>
+              <th>
+                <button class="sort-button" data-sort="create">Create</button>
+              </th>
+              <th>
+                <button class="sort-button" data-sort="read">Read</button>
+              </th>
+              <th>
+                <button class="sort-button" data-sort="write">Write</button>
+              </th>
+              <th>
+                <button class="sort-button" data-sort="delete">Delete</button>
+              </th>
+              <th>
+                <button class="sort-button" data-sort="append">Append</button>
+                <span
+                  class="info-tooltip"
+                  tabindex="0"
+                  role="img"
+                  aria-label="Append permission info"
+                  data-tooltip="Append allows lookups on this table to reference other tables. Requires Append To on the target table."
+                  >i</span>
+              </th>
+              <th>
+                <button class="sort-button" data-sort="appendto">Append To</button>
+                <span
+                  class="info-tooltip"
+                  tabindex="0"
+                  role="img"
+                  aria-label="Append To permission info"
+                  data-tooltip="Append To lets other records do a lookup to this table. Requires Append on the source table."
+                  >i</span>
+              </th>
+              <th>
+                <button class="sort-button" data-sort="assign">Assign</button>
+              </th>
+            </tr>
+            <tr class="filter-row">
+              <th></th>
+              <th></th>
+              <th>
+                <select class="filter-select" data-filter="create"></select>
+              </th>
+              <th>
+                <select class="filter-select" data-filter="read"></select>
+              </th>
+              <th>
+                <select class="filter-select" data-filter="write"></select>
+              </th>
+              <th>
+                <select class="filter-select" data-filter="delete"></select>
+              </th>
+              <th>
+                <select class="filter-select" data-filter="append"></select>
+              </th>
+              <th>
+                <select class="filter-select" data-filter="appendto"></select>
+              </th>
+              <th>
+                <select class="filter-select" data-filter="assign"></select>
+              </th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+      <section id="tab-assignments" class="tab-panel hidden">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-header-text">
+              <h2 id="assignment-title">User roles</h2>
+              <p id="assignment-status" class="subtitle">Select a role or user to view assignments.</p>
+            </div>
+            <div class="panel-actions">
+              <button id="assignment-add" class="btn">Add</button>
+              <button id="assignment-remove" class="btn">Remove</button>
+              <span id="assignment-count" class="pending-count hidden">0</span>
+            </div>
+          </div>
+          <div class="assignment-list">
+            <div class="assignment-toolbar">
+              <button type="button" class="link-button" id="assignment-select-all">Select all</button>
+              <button type="button" class="link-button" id="assignment-clear">Clear</button>
+            </div>
+            <div class="assignment-table">
+              <table class="table" id="assignment-table">
+                <thead>
+                  <tr>
+                    <th>
+                      <button class="sort-button" data-assign-sort="label">User / Role</button>
+                    </th>
+                    <th>
+                      <button class="sort-button" data-assign-sort="assigned">Assigned</button>
+                    </th>
+                    <th>Select</th>
+                  </tr>
+                  <tr class="filter-row">
+                    <th></th>
+                    <th>
+                      <select id="assignment-filter-assigned" class="filter-select">
+                        <option value="">All</option>
+                        <option value="assigned">Assigned</option>
+                        <option value="not-assigned">Not assigned</option>
+                      </select>
+                    </th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="assignment-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="logs">
+        <h2>Activity</h2>
+        <pre id="log"></pre>
+      </section>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
