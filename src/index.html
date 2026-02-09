@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Advanced Security Roles Explorer</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="index.css" />
   </head>
   <body>
     <div id="app">
@@ -14,27 +14,37 @@
           <p class="subtitle">Be fully in control of your security by quickly viewing and managing which security roles give access to which tables. And who is assigned which security role.</p>
         </div>
         <div class="header-actions">
+          <div class="header-info">
+            <div id="connection-badge" class="badge">Not connected</div>
+            <button type="button" id="theme-toggle" class="btn theme-toggle" aria-label="Toggle theme">
+              <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="4"></circle>
+                <line x1="12" y1="2" x2="12" y2="5"></line>
+                <line x1="12" y1="19" x2="12" y2="22"></line>
+                <line x1="2" y1="12" x2="5" y2="12"></line>
+                <line x1="19" y1="12" x2="22" y2="12"></line>
+                <line x1="4.2" y1="4.2" x2="6.4" y2="6.4"></line>
+                <line x1="17.6" y1="17.6" x2="19.8" y2="19.8"></line>
+                <line x1="4.2" y1="19.8" x2="6.4" y2="17.6"></line>
+                <line x1="17.6" y1="6.4" x2="19.8" y2="4.2"></line>
+              </svg>
+              <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M21 14.2A8 8 0 0 1 9.8 3a9 9 0 1 0 11.2 11.2z" />
+              </svg>
+            </button>
+          </div>
           <nav class="tabs">
             <button class="tab-button active" data-tab="privileges">Edit security roles</button>
             <button class="tab-button" data-tab="assignments">Assign security roles</button>
+            <button class="tab-button" data-tab="dashboard">Security dashboard</button>
           </nav>
-          <div id="connection-badge" class="badge">Not connected</div>
-          <button type="button" id="theme-toggle" class="btn theme-toggle" aria-label="Toggle theme">
-            <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="4"></circle>
-              <line x1="12" y1="2" x2="12" y2="5"></line>
-              <line x1="12" y1="19" x2="12" y2="22"></line>
-              <line x1="2" y1="12" x2="5" y2="12"></line>
-              <line x1="19" y1="12" x2="22" y2="12"></line>
-              <line x1="4.2" y1="4.2" x2="6.4" y2="6.4"></line>
-              <line x1="17.6" y1="17.6" x2="19.8" y2="19.8"></line>
-              <line x1="4.2" y1="19.8" x2="6.4" y2="17.6"></line>
-              <line x1="17.6" y1="6.4" x2="19.8" y2="4.2"></line>
-            </svg>
-            <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M21 14.2A8 8 0 0 1 9.8 3a9 9 0 1 0 11.2 11.2z" />
-            </svg>
-          </button>
+          <div class="header-filter">
+            <label class="toggle" for="roles-custom-only-global">
+              <input type="checkbox" id="roles-custom-only-global" />
+              <span class="toggle-track"></span>
+            </label>
+            <span class="toggle-label">Unmanaged roles only</span>
+          </div>
         </div>
       </header>
 
@@ -85,6 +95,8 @@
             <select id="assignment-mode">
               <option value="role">Role -> Users</option>
               <option value="user">User -> Roles</option>
+              <option value="role-team">Role -> Teams</option>
+              <option value="team">Team -> Roles</option>
             </select>
           </div>
           <div class="control" id="assignment-role-control">
@@ -94,6 +106,44 @@
           <div class="control" id="assignment-user-control">
             <label for="assignment-user-select">User</label>
             <select id="assignment-user-select"></select>
+          </div>
+          <div class="control" id="assignment-team-control">
+            <label for="assignment-team-select">Team</label>
+            <select id="assignment-team-select"></select>
+          </div>
+        </div>
+        <div id="controls-dashboard" class="controls-group hidden">
+          <div class="control">
+            <label for="dashboard-user-status">User status</label>
+            <select id="dashboard-user-status">
+              <option value="all">All</option>
+              <option value="active">Active only</option>
+              <option value="inactive">Inactive only</option>
+            </select>
+          </div>
+          <div class="control">
+            <label for="dashboard-user-type">User type</label>
+            <select id="dashboard-user-type">
+              <option value="all">All</option>
+              <option value="human">Human</option>
+              <option value="app">Application</option>
+            </select>
+          </div>
+          <div class="control">
+            <label for="dashboard-bu-select">Business unit</label>
+            <select id="dashboard-bu-select"></select>
+          </div>
+          <div class="control">
+            <label for="dashboard-role-select">Security role</label>
+            <select id="dashboard-role-select"></select>
+          </div>
+          <div class="control">
+            <label for="dashboard-team-select">Team</label>
+            <select id="dashboard-team-select"></select>
+          </div>
+          <div class="control">
+            <label>&nbsp;</label>
+            <button type="button" class="btn" id="dashboard-export">Download data</button>
           </div>
         </div>
       </section>
@@ -105,6 +155,7 @@
             <button id="undo-btn" class="btn">Undo changes</button>
             <button id="apply-btn" class="btn">Apply changes</button>
             <span id="pending-count" class="pending-count hidden">0</span>
+            <button id="refresh-btn" class="btn">Refresh</button>
           </div>
         </div>
         <div id="table-loading" class="table-loading hidden">
@@ -115,6 +166,10 @@
             </div>
             <div id="loading-text" class="loading-text">Preparing...</div>
           </div>
+        </div>
+        <div id="table-empty" class="table-empty hidden">
+          <div class="table-empty-title">No data loaded</div>
+          <div class="table-empty-text">Please click refresh to load data.</div>
         </div>
         <table class="table" id="privileges-table">
           <thead>
@@ -236,6 +291,118 @@
           </div>
         </div>
       </section>
+      <section id="tab-dashboard" class="tab-panel hidden">
+        <div class="panel dashboard-panel">
+          <div id="dashboard-loading" class="table-loading hidden">
+            <div class="loading-card">
+              <div class="loading-title">Loading dashboard</div>
+              <div class="loading-progress">
+                <div id="dashboard-loading-bar" class="loading-bar"></div>
+              </div>
+              <div id="dashboard-loading-text" class="loading-text">Preparing...</div>
+            </div>
+          </div>
+          <div class="dashboard-content">
+            <div class="dashboard-grid">
+              <div class="dashboard-card metric-card">
+                <div class="metric-label">Active human users</div>
+                <div id="metric-human-active" class="metric-value">0</div>
+              </div>
+              <div class="dashboard-card metric-card">
+                <div class="metric-label">Inactive human users</div>
+                <div id="metric-human-inactive" class="metric-value">0</div>
+              </div>
+              <div class="dashboard-card metric-card">
+                <div class="metric-label">Active application users</div>
+                <div id="metric-app-active" class="metric-value">0</div>
+              </div>
+              <div class="dashboard-card metric-card">
+                <div class="metric-label">Inactive application users</div>
+                <div id="metric-app-inactive" class="metric-value">0</div>
+              </div>
+              <div class="dashboard-card metric-card">
+                <div class="metric-label">Unmanaged roles</div>
+                <div id="metric-custom-roles" class="metric-value">0</div>
+              </div>
+              <div class="dashboard-card metric-card">
+                <div class="metric-label">Managed roles</div>
+                <div id="metric-managed-roles" class="metric-value">0</div>
+              </div>
+              <div class="dashboard-card metric-card">
+                <div class="metric-label">Roles without users</div>
+                <div id="metric-roles-without-users" class="metric-value">0</div>
+              </div>
+              <div class="dashboard-card metric-card">
+                <div class="metric-label">Total teams</div>
+                <div id="metric-total-teams" class="metric-value">0</div>
+              </div>
+            </div>
+            <div class="dashboard-charts">
+              <div class="dashboard-card chart-card" data-dashboard-chart="usersByRole">
+                <div class="chart-header">
+                  <div class="chart-title-row">
+                    <h3>Active users per role</h3>
+                    <button type="button" class="link-button chart-expand" data-dashboard-chart="usersByRole">
+                      View all
+                    </button>
+                  </div>
+                  <p class="subtitle">Based on active user assignments.</p>
+                </div>
+                <canvas id="chart-users-by-role"></canvas>
+              </div>
+              <div class="dashboard-card chart-card" data-dashboard-chart="teamsByRole">
+                <div class="chart-header">
+                  <div class="chart-title-row">
+                    <h3>Teams per role</h3>
+                    <button type="button" class="link-button chart-expand" data-dashboard-chart="teamsByRole">
+                      View all
+                    </button>
+                  </div>
+                  <p class="subtitle">Shows how many teams carry each role.</p>
+                </div>
+                <canvas id="chart-teams-by-role"></canvas>
+              </div>
+              <div class="dashboard-card chart-card" data-dashboard-chart="usersByBusinessUnit">
+                <div class="chart-header">
+                  <div class="chart-title-row">
+                    <h3>Users per business unit</h3>
+                    <button type="button" class="link-button chart-expand" data-dashboard-chart="usersByBusinessUnit">
+                      View all
+                    </button>
+                  </div>
+                  <p class="subtitle">Filtered by user status/type and business unit.</p>
+                </div>
+                <canvas id="chart-users-by-bu"></canvas>
+              </div>
+              <div class="dashboard-card chart-card" data-dashboard-chart="usersByTeam">
+                <div class="chart-header">
+                  <div class="chart-title-row">
+                    <h3>Users per team</h3>
+                    <button type="button" class="link-button chart-expand" data-dashboard-chart="usersByTeam">
+                      View all
+                    </button>
+                  </div>
+                  <p class="subtitle">Filtered by user status/type and team.</p>
+                </div>
+                <canvas id="chart-users-by-team"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div id="chart-modal" class="modal hidden" aria-hidden="true">
+        <div class="modal-backdrop" data-modal-close="true"></div>
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="chart-modal-title">
+          <div class="modal-header">
+            <h3 id="chart-modal-title">Chart</h3>
+            <button type="button" class="btn" id="chart-modal-close">Close</button>
+          </div>
+          <div class="modal-body">
+            <canvas id="chart-modal-canvas"></canvas>
+          </div>
+        </div>
+      </div>
 
       <section class="logs">
         <h2>Activity</h2>

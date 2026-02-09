@@ -26,15 +26,22 @@
   "files": ["dist/**", "README.md", "docs/**"],
   "scripts": {
     "build": "npm run build:bundle && npm run build:assets",
-    "build:bundle": "esbuild app.ts --bundle --sourcemap --outdir=dist",
-    "build:assets": "mkdir -p dist && cp index.html styles.css dist/",
-    "build:watch": "esbuild app.ts --bundle --sourcemap --outdir=dist --watch",
+    "build:bundle": "esbuild src/app.ts --bundle --sourcemap --outdir=dist",
+    "build:assets": "mkdir -p dist && cp src/index.html src/index.css dist/",
+    "build:watch": "esbuild src/app.ts --bundle --sourcemap --outdir=dist --watch",
     "finalize-package": "pptb finalize",
-    "validate:publish": "node scripts/validate-publish.js"
+    "validate:publish": "node scripts/validate-publish.js",
+    "version:beta": "npm version prerelease --preid beta",
+    "version:stable": "npm version patch",
+    "publish:beta": "npm publish --access public --tag beta",
+    "publish:stable": "npm publish --access public"
   },
   "devDependencies": {
     "@pptb/types": "1.0.19-beta.3",
     "esbuild": "^0.20.2",
     "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.1"
   }
 }

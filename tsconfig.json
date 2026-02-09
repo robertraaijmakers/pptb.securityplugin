@@ -8,5 +8,5 @@
     "lib": ["ES2020", "DOM"],
     "types": ["@pptb/types"]
   },
-  "include": ["app.ts"]
+  "include": ["src/**/*.ts"]
 }
