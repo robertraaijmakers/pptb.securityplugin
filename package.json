@@ -27,7 +27,7 @@
     "repository": "https://github.com/robertraaijmakers/pptb.securityplugin/",
     "website": "https://robertraaijmakers.github.io/pptb.securityplugin/",
     "readmeUrl": "https://raw.githubusercontent.com/robertraaijmakers/pptb.securityplugin/main/README.md",
-    "iconUrl": "https://raw.githubusercontent.com/robertraaijmakers/pptb.securityplugin/main/assets/smallIcon.png"
+    "iconUrl": "https://raw.githubusercontent.com/robertraaijmakers/pptb.securityplugin/refs/heads/main/assets/icon.svg"
   },
   "files": [
     "dist/**",
