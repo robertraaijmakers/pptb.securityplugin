@@ -1,6 +1,6 @@
 {
   "name": "@robertraaijmakers/pptb-securityplugin",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "displayName": "Security Roles Explorer",
   "description": "Be fully in control of your security by quickly viewing and managing which security roles give access to which tables. And who is assigned which security role.",
   "author": "Robert Raaijmakers",
@@ -23,7 +23,7 @@
     "website": "https://robertraaijmakers.github.io/pptb.securityplugin/",
     "readmeUrl": "https://raw.githubusercontent.com/robertraaijmakers/pptb.securityplugin/main/README.md"
   },
-  "files": ["dist/**", "README.md", "docs/**"],
+  "files": ["dist/**", "README.md"],
   "scripts": {
     "build": "npm run build:bundle && npm run build:assets",
     "build:bundle": "esbuild src/app.ts --bundle --sourcemap --outdir=dist",
