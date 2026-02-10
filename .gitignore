@@ -3,3 +3,4 @@ app.js
 app.js.map
 dist/
 npm-shrinkwrap.json
+.DS_Store
