@@ -36,7 +36,7 @@
   "scripts": {
     "build": "npm run build:bundle && npm run build:assets",
     "build:bundle": "esbuild src/app.ts --bundle --sourcemap --outdir=dist",
-    "build:assets": "mkdir -p dist && cp src/index.html src/index.css README.md dist/",
+    "build:assets": "node scripts/build-assets.js",
     "build:watch": "esbuild src/app.ts --bundle --sourcemap --outdir=dist --watch",
     "finalize-package": "node scripts/finalize-package.js",
     "validate:publish": "node scripts/validate-publish.js",
