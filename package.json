@@ -31,7 +31,8 @@
   },
   "files": [
     "dist/**",
-    "README.md"
+    "README.md",
+    "npm-shrinkwrap.json"
   ],
   "scripts": {
     "build": "npm run build:bundle && npm run build:assets",
