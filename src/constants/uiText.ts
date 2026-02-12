@@ -11,6 +11,10 @@ export const UI_TEXT = {
   loadingDashboardRoleTeamCounts: "Loading teams per role",
   loadingDashboardFilters: "Preparing dashboard filters",
   tableTitlePrivileges: "Privileges",
+  bulkUpdateSelect: "Set visible...",
+  bulkUpdateApply: "Set",
+  bulkUpdateNoRights: "No visible rights in this column",
+  bulkUpdateNoSelection: "Select a level first",
   roleFilterAll: "All roles",
   statusAssigned: "Assigned",
   statusNotAssigned: "Not assigned",
@@ -39,12 +43,14 @@ export const UI_TEXT = {
   labelAll: "All",
   labelCustomRolesOnly: "Unmanaged roles only",
   chartEmpty: "No data for this selection.",
-  logPptbUnavailable: "PPTB APIs not available. Load inside Power Platform ToolBox.",
+  logPptbUnavailable:
+    "PPTB APIs not available. Load inside Power Platform ToolBox.",
   logInitFailed: "Initialization failed. Check console for details.",
   logClearedPending: "Cleared pending privilege changes.",
   logPrivilegesCacheFailed:
     "Failed to retrieve privileges cache. Check API permissions or entity access.",
-  logDashboardLoadFailed: "Dashboard data load failed. Check console for details.",
+  logDashboardLoadFailed:
+    "Dashboard data load failed. Check console for details.",
 };
 
 export const NOTIFICATIONS = {
@@ -92,19 +98,31 @@ export function formatPrivilegesForTableTitle(entityLabel: string): string {
   return `Privileges for table: ${entityLabel}`;
 }
 
-export function formatAssignmentTitleUsersWithRole(roleName: string, count: number): string {
+export function formatAssignmentTitleUsersWithRole(
+  roleName: string,
+  count: number,
+): string {
   return `Users with role: ${roleName} (${count} users)`;
 }
 
-export function formatAssignmentTitleRolesForUser(userName: string, count: number): string {
+export function formatAssignmentTitleRolesForUser(
+  userName: string,
+  count: number,
+): string {
   return `Roles for user: ${userName} (${count} assigned)`;
 }
 
-export function formatAssignmentTitleTeamsWithRole(roleName: string, count: number): string {
+export function formatAssignmentTitleTeamsWithRole(
+  roleName: string,
+  count: number,
+): string {
   return `Teams with role: ${roleName} (${count} teams)`;
 }
 
-export function formatAssignmentTitleRolesForTeam(teamName: string, count: number): string {
+export function formatAssignmentTitleRolesForTeam(
+  teamName: string,
+  count: number,
+): string {
   return `Roles for team: ${teamName} (${count} assigned)`;
 }
 
@@ -120,7 +138,10 @@ export function formatApplyingChanges(count: number): string {
   return `Applying ${count} changes...`;
 }
 
-export function formatMissingPrivilegeId(entityLogicalName: string, privilege: string): string {
+export function formatMissingPrivilegeId(
+  entityLogicalName: string,
+  privilege: string,
+): string {
   return `Missing privilege ID for ${entityLogicalName}:${privilege}`;
 }
 
@@ -134,6 +155,22 @@ export function formatCachedPrivileges(
   roleCount: number,
 ): string {
   return `Cached ${privilegeCount} privileges and ${rolePrivilegeCount} role privilege rows for ${roleCount} roles.`;
+}
+
+export function formatBulkUpdatedVisible(
+  privilegeLabel: string,
+  levelLabel: string,
+  updatedCount: number,
+  skippedCount: number,
+): string {
+  if (skippedCount > 0) {
+    return `Bulk set ${privilegeLabel} to ${levelLabel} for ${updatedCount} visible rows (${skippedCount} skipped).`;
+  }
+  return `Bulk set ${privilegeLabel} to ${levelLabel} for ${updatedCount} visible rows.`;
+}
+
+export function formatBulkUpdateNoRows(privilegeLabel: string): string {
+  return `No visible rows with editable ${privilegeLabel} rights.`;
 }
 
 export function formatRoleAssignmentLogUsers(

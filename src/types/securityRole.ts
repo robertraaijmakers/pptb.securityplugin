@@ -1,6 +1,19 @@
-export type PrivilegeLevel = "none" | "user" | "businessUnit" | "parentChild" | "organization";
+export type PrivilegeLevel =
+  | "none"
+  | "user"
+  | "businessUnit"
+  | "parentChild"
+  | "organization";
 
-export type AccessRight = "create" | "read" | "write" | "delete" | "append" | "appendto" | "assign";
+export type AccessRight =
+  | "create"
+  | "read"
+  | "write"
+  | "delete"
+  | "append"
+  | "appendto"
+  | "assign"
+  | "share";
 
 export type SortColumn = "label" | AccessRight;
 export type SortDirection = "asc" | "desc";
@@ -17,6 +30,7 @@ export type PrivilegeRow = {
   append: PrivilegeLevel;
   appendto: PrivilegeLevel;
   assign: PrivilegeLevel;
+  share: PrivilegeLevel;
 };
 
 export type RoleSummary = {
