@@ -527,11 +527,10 @@ body.theme-dark .btn:not(:disabled):hover {
   padding: 16px 20px 20px;
 }
 
-.assignment-toolbar {
+.assignment-filter-actions {
   display: flex;
-  justify-content: flex-end;
   gap: 12px;
-  margin-bottom: 12px;
+  align-items: center;
 }
 
 .assignment-table {
@@ -995,6 +994,7 @@ body.theme-dark .bulk-apply:not(:disabled):hover {
 
 .table.hide-ownership thead tr:first-child th:nth-child(2),
 .table.hide-ownership thead tr.filter-row th:nth-child(2),
+.table.hide-ownership thead tr.bulk-row th:nth-child(2),
 .table.hide-ownership tbody td:nth-child(2) {
   display: none;
 }

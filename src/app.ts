@@ -660,14 +660,18 @@ function applyRoleFilterToUi() {
 
 function setLoading(active: boolean, message?: string) {
   state.loading.active = active;
+  const hasLoadedData = state.cacheLoaded;
   if (elements.tableLoading) {
     elements.tableLoading.classList.toggle("hidden", !active);
   }
   if (elements.privilegesTableRoot) {
-    elements.privilegesTableRoot.classList.toggle("hidden", active);
+    elements.privilegesTableRoot.classList.toggle(
+      "hidden",
+      active || !hasLoadedData,
+    );
   }
   if (elements.tableEmpty) {
-    elements.tableEmpty.classList.toggle("hidden", active || state.cacheLoaded);
+    elements.tableEmpty.classList.toggle("hidden", active || hasLoadedData);
   }
   if (message && elements.loadingText) {
     elements.loadingText.textContent = message;
