@@ -153,6 +153,7 @@ const state = {
   },
   assignmentFilter: "" as "" | "assigned" | "not-assigned",
   assignmentSearch: "",
+  privilegeSearch: "",
   sort: {
     column: "label" as SortColumn,
     direction: "asc" as SortDirection,
@@ -265,6 +266,9 @@ const elements = {
   ) as HTMLSelectElement,
   assignmentSearch: document.getElementById(
     "assignment-search",
+  ) as HTMLInputElement,
+  privilegeSearch: document.getElementById(
+    "privilege-search",
   ) as HTMLInputElement,
   controlsPrivileges: document.getElementById(
     "controls-privileges",
@@ -1299,6 +1303,16 @@ function getPrivilegeSortRank(
 
 function applySortAndFilters(rows: PrivilegeRow[]): PrivilegeRow[] {
   const filtered = rows.filter((row) => {
+    if (state.privilegeSearch) {
+      const term = state.privilegeSearch.toLowerCase();
+      const labelMatch = row.entityLabel.toLowerCase().includes(term);
+      const logicalNameMatch = row.entityLogicalName
+        .toLowerCase()
+        .includes(term);
+      if (!labelMatch && !logicalNameMatch) {
+        return false;
+      }
+    }
     if (state.rightsFilter === "with" && !hasAnyRights(row)) {
       return false;
     }
@@ -1411,6 +1425,14 @@ function renderPrivilegeTable() {
       } else if (row.roleId) {
         select.dataset.roleId = row.roleId;
       }
+      const pending = select.dataset.roleId
+        ? findPendingChange(
+            select.dataset.roleId,
+            row.entityLogicalName,
+            privilege,
+          )
+        : undefined;
+      const effectiveLevel = pending?.level ?? row[privilege];
       for (const optionMeta of levelOptions) {
         if (!allowedLevels.includes(optionMeta.level)) {
           continue;
@@ -1420,7 +1442,7 @@ function renderPrivilegeTable() {
         option.textContent = `${optionMeta.icon} ${optionMeta.label}`;
         option.className = optionMeta.className;
         option.style.color = getLevelColor(optionMeta.level);
-        if (row[privilege] === optionMeta.level) {
+        if (effectiveLevel === optionMeta.level) {
           option.selected = true;
         }
         select.appendChild(option);
@@ -1444,16 +1466,7 @@ function renderPrivilegeTable() {
       select.addEventListener("change", () => {
         applyLevelClass(select, select.value as PrivilegeLevel);
       });
-      if (select.dataset.roleId) {
-        const pending = Boolean(
-          findPendingChange(
-            select.dataset.roleId,
-            row.entityLogicalName,
-            privilege,
-          ),
-        );
-        setPendingClass(select, pending);
-      }
+      setPendingClass(select, Boolean(pending));
       td.appendChild(select);
       tr.appendChild(td);
     }
@@ -3753,6 +3766,22 @@ function wireEvents() {
     elements.assignmentSearch.addEventListener("input", () => {
       state.assignmentSearch = elements.assignmentSearch.value.trim();
       renderAssignmentTable(state.assignmentItems);
+    });
+  }
+
+  if (elements.privilegeSearch) {
+    elements.privilegeSearch.addEventListener("input", async () => {
+      state.privilegeSearch = elements.privilegeSearch.value
+        .trim()
+        .toLowerCase();
+      if (!state.cacheLoaded) {
+        const loaded = await ensureSecurityCacheLoaded();
+        if (loaded) {
+          await refreshPrivilegeView();
+        }
+        return;
+      }
+      renderPrivilegeTable();
     });
   }
 

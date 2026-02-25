@@ -925,6 +925,7 @@ body.theme-dark .bulk-row th {
   border-radius: 8px;
   border: 1px solid var(--border);
   background: #fff;
+  color: var(--ink);
   font-size: 12px;
   text-transform: none;
   letter-spacing: 0;
@@ -935,11 +936,18 @@ body.theme-dark .bulk-row th {
   border-radius: 8px;
   border: 1px solid var(--border);
   background: #fff;
+  color: var(--ink);
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.3px;
   cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.bulk-apply:not(:disabled):hover {
+  background: #f6efe6;
+  border-color: #d4c5b6;
 }
 
 .bulk-apply:disabled,
@@ -951,6 +959,13 @@ body.theme-dark .bulk-row th {
 body.theme-dark .bulk-select,
 body.theme-dark .bulk-apply {
   background: #1f1b17;
+  color: var(--ink);
+  border-color: var(--border);
+}
+
+body.theme-dark .bulk-apply:not(:disabled):hover {
+  background: #2a241f;
+  border-color: #3f362f;
 }
 
 .filter-select {
