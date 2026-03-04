@@ -213,9 +213,20 @@
               <th>
                 <button class="sort-button" data-sort="assign">Assign</button>
               </th>
+              <th>
+                <button class="sort-button" data-sort="share">Share</button>
+              </th>
             </tr>
             <tr class="filter-row">
-              <th></th>
+              <th>
+                <input
+                  type="text"
+                  id="privilege-search"
+                  class="filter-input"
+                  placeholder="Search entities or roles..."
+                  aria-label="Search entities or roles"
+                />
+              </th>
               <th></th>
               <th>
                 <select class="filter-select" data-filter="create"></select>
@@ -238,6 +249,63 @@
               <th>
                 <select class="filter-select" data-filter="assign"></select>
               </th>
+              <th>
+                <select class="filter-select" data-filter="share"></select>
+              </th>
+            </tr>
+            <tr class="bulk-row">
+              <th>
+                <span class="bulk-label">Bulk update visible rows</span>
+              </th>
+              <th></th>
+              <th>
+                <div class="bulk-control">
+                  <select class="bulk-select" data-bulk-select="create"></select>
+                  <button type="button" class="bulk-apply" data-bulk-apply="create">Set</button>
+                </div>
+              </th>
+              <th>
+                <div class="bulk-control">
+                  <select class="bulk-select" data-bulk-select="read"></select>
+                  <button type="button" class="bulk-apply" data-bulk-apply="read">Set</button>
+                </div>
+              </th>
+              <th>
+                <div class="bulk-control">
+                  <select class="bulk-select" data-bulk-select="write"></select>
+                  <button type="button" class="bulk-apply" data-bulk-apply="write">Set</button>
+                </div>
+              </th>
+              <th>
+                <div class="bulk-control">
+                  <select class="bulk-select" data-bulk-select="delete"></select>
+                  <button type="button" class="bulk-apply" data-bulk-apply="delete">Set</button>
+                </div>
+              </th>
+              <th>
+                <div class="bulk-control">
+                  <select class="bulk-select" data-bulk-select="append"></select>
+                  <button type="button" class="bulk-apply" data-bulk-apply="append">Set</button>
+                </div>
+              </th>
+              <th>
+                <div class="bulk-control">
+                  <select class="bulk-select" data-bulk-select="appendto"></select>
+                  <button type="button" class="bulk-apply" data-bulk-apply="appendto">Set</button>
+                </div>
+              </th>
+              <th>
+                <div class="bulk-control">
+                  <select class="bulk-select" data-bulk-select="assign"></select>
+                  <button type="button" class="bulk-apply" data-bulk-apply="assign">Set</button>
+                </div>
+              </th>
+              <th>
+                <div class="bulk-control">
+                  <select class="bulk-select" data-bulk-select="share"></select>
+                  <button type="button" class="bulk-apply" data-bulk-apply="share">Set</button>
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -257,10 +325,6 @@
             </div>
           </div>
           <div class="assignment-list">
-            <div class="assignment-toolbar">
-              <button type="button" class="link-button" id="assignment-select-all">Select all</button>
-              <button type="button" class="link-button" id="assignment-clear">Clear</button>
-            </div>
             <div class="assignment-table">
               <table class="table" id="assignment-table">
                 <thead>
@@ -290,7 +354,12 @@
                         <option value="not-assigned">Not assigned</option>
                       </select>
                     </th>
-                    <th></th>
+                    <th>
+                      <div class="assignment-filter-actions">
+                        <button type="button" class="link-button" id="assignment-select-all">Select all</button>
+                        <button type="button" class="link-button" id="assignment-clear">Clear</button>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody id="assignment-table-body"></tbody>

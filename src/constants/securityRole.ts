@@ -8,6 +8,7 @@ export const accessRights: AccessRight[] = [
   "append",
   "appendto",
   "assign",
+  "share",
 ];
 
 export const privilegeLabels: Record<AccessRight, string> = {
@@ -18,6 +19,7 @@ export const privilegeLabels: Record<AccessRight, string> = {
   append: "Append",
   appendto: "Append To",
   assign: "Assign",
+  share: "Share",
 };
 
 export const levelOptions: Array<{
@@ -27,9 +29,24 @@ export const levelOptions: Array<{
   className: string;
 }> = [
   { level: "user", icon: "👤", label: "User", className: "level-user" },
-  { level: "businessUnit", icon: "🏢", label: "Business Unit", className: "level-businessUnit" },
-  { level: "parentChild", icon: "🧩", label: "Parent: Child BU", className: "level-parentChild" },
-  { level: "organization", icon: "🌐", label: "Organization", className: "level-organization" },
+  {
+    level: "businessUnit",
+    icon: "🏢",
+    label: "Business Unit",
+    className: "level-businessUnit",
+  },
+  {
+    level: "parentChild",
+    icon: "🧩",
+    label: "Parent: Child BU",
+    className: "level-parentChild",
+  },
+  {
+    level: "organization",
+    icon: "🌐",
+    label: "Organization",
+    className: "level-organization",
+  },
   { level: "none", icon: "⛔", label: "None", className: "level-none" },
 ];
 

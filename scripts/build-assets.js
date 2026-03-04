@@ -3,7 +3,7 @@ const path = require("path");
 
 const rootDir = path.resolve(__dirname, "..");
 const distDir = path.join(rootDir, "dist");
-const filesToCopy = ["src/index.html", "src/index.css", "README.md"];
+const filesToCopy = ["src/index.html", "src/index.css", "README.md", "assets/icon.svg"];
 
 if (!fs.existsSync(distDir)) {
   fs.mkdirSync(distDir, { recursive: true });

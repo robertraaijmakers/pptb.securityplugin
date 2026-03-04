@@ -41,7 +41,12 @@ import {
   DashboardUser,
   TeamMembership,
 } from "./types/dashboard";
-import { accessRights, levelColorMap, levelOptions } from "./constants/securityRole";
+import {
+  accessRights,
+  levelColorMap,
+  levelOptions,
+  privilegeLabels,
+} from "./constants/securityRole";
 import {
   FILTER_OPTIONS,
   NOTIFICATIONS,
@@ -53,6 +58,8 @@ import {
   formatAssignmentTitleUsersWithRole,
   formatAssignmentSelectLabel,
   formatCachedPrivileges,
+  formatBulkUpdatedVisible,
+  formatBulkUpdateNoRows,
   formatLoadingStatus,
   formatMissingPrivilegeId,
   formatNoPrivilegesForRole,
@@ -88,7 +95,10 @@ const state = {
   pendingChanges: [] as PendingChange[],
   privilegeIdByKey: new Map<string, string>(),
   privilegeInfoById: new Map<string, PrivilegeInfo>(),
-  rolePrivileges: new Map<string, Map<string, Record<AccessRight, PrivilegeLevel>>>(),
+  rolePrivileges: new Map<
+    string,
+    Map<string, Record<AccessRight, PrivilegeLevel>>
+  >(),
   tableMode: "role" as FilterMode,
   selectedRoleIds: new Set<string>(),
   hideManagedRoles: false,
@@ -143,6 +153,7 @@ const state = {
   },
   assignmentFilter: "" as "" | "assigned" | "not-assigned",
   assignmentSearch: "",
+  privilegeSearch: "",
   sort: {
     column: "label" as SortColumn,
     direction: "asc" as SortDirection,
@@ -155,6 +166,7 @@ const state = {
     append: "",
     appendto: "",
     assign: "",
+    share: "",
   } as Record<AccessRight, string>,
   eventsHooked: false,
   readyToastShown: false,
@@ -167,56 +179,133 @@ const state = {
 };
 
 const elements = {
-  connectionBadge: document.getElementById("connection-badge") as HTMLDivElement,
+  connectionBadge: document.getElementById(
+    "connection-badge",
+  ) as HTMLDivElement,
   filterMode: document.getElementById("filter-mode") as HTMLSelectElement,
   roleSelect: document.getElementById("role-select") as HTMLSelectElement,
   entitySelect: document.getElementById("entity-select") as HTMLSelectElement,
-  roleSelectControl: document.getElementById("role-select-control") as HTMLDivElement,
-  entitySelectControl: document.getElementById("entity-select-control") as HTMLDivElement,
+  roleSelectControl: document.getElementById(
+    "role-select-control",
+  ) as HTMLDivElement,
+  entitySelectControl: document.getElementById(
+    "entity-select-control",
+  ) as HTMLDivElement,
   rightsFilter: document.getElementById("rights-filter") as HTMLSelectElement,
-  roleFilterControl: document.getElementById("role-filter-control") as HTMLDivElement,
-  roleFilterButton: document.getElementById("role-filter-button") as HTMLButtonElement,
+  roleFilterControl: document.getElementById(
+    "role-filter-control",
+  ) as HTMLDivElement,
+  roleFilterButton: document.getElementById(
+    "role-filter-button",
+  ) as HTMLButtonElement,
   roleFilterMenu: document.getElementById("role-filter-menu") as HTMLDivElement,
   roleFilterList: document.getElementById("role-filter-list") as HTMLDivElement,
-  roleFilterAll: document.getElementById("role-filter-all") as HTMLButtonElement,
-  roleFilterNone: document.getElementById("role-filter-none") as HTMLButtonElement,
-  rolesCustomOnlyGlobal: document.getElementById("roles-custom-only-global") as HTMLInputElement,
-  tabButtons: Array.from(document.querySelectorAll(".tab-button")) as HTMLButtonElement[],
+  roleFilterAll: document.getElementById(
+    "role-filter-all",
+  ) as HTMLButtonElement,
+  roleFilterNone: document.getElementById(
+    "role-filter-none",
+  ) as HTMLButtonElement,
+  rolesCustomOnlyGlobal: document.getElementById(
+    "roles-custom-only-global",
+  ) as HTMLInputElement,
+  tabButtons: Array.from(
+    document.querySelectorAll(".tab-button"),
+  ) as HTMLButtonElement[],
   tabPrivileges: document.getElementById("tab-privileges") as HTMLElement,
   tabAssignments: document.getElementById("tab-assignments") as HTMLElement,
   tabDashboard: document.getElementById("tab-dashboard") as HTMLElement,
-  assignmentMode: document.getElementById("assignment-mode") as HTMLSelectElement,
-  assignmentRoleSelect: document.getElementById("assignment-role-select") as HTMLSelectElement,
-  assignmentUserSelect: document.getElementById("assignment-user-select") as HTMLSelectElement,
-  assignmentTeamSelect: document.getElementById("assignment-team-select") as HTMLSelectElement,
-  assignmentRoleControl: document.getElementById("assignment-role-control") as HTMLDivElement,
-  assignmentUserControl: document.getElementById("assignment-user-control") as HTMLDivElement,
-  assignmentTeamControl: document.getElementById("assignment-team-control") as HTMLDivElement,
-  assignmentTitle: document.getElementById("assignment-title") as HTMLHeadingElement,
+  assignmentMode: document.getElementById(
+    "assignment-mode",
+  ) as HTMLSelectElement,
+  assignmentRoleSelect: document.getElementById(
+    "assignment-role-select",
+  ) as HTMLSelectElement,
+  assignmentUserSelect: document.getElementById(
+    "assignment-user-select",
+  ) as HTMLSelectElement,
+  assignmentTeamSelect: document.getElementById(
+    "assignment-team-select",
+  ) as HTMLSelectElement,
+  assignmentRoleControl: document.getElementById(
+    "assignment-role-control",
+  ) as HTMLDivElement,
+  assignmentUserControl: document.getElementById(
+    "assignment-user-control",
+  ) as HTMLDivElement,
+  assignmentTeamControl: document.getElementById(
+    "assignment-team-control",
+  ) as HTMLDivElement,
+  assignmentTitle: document.getElementById(
+    "assignment-title",
+  ) as HTMLHeadingElement,
   assignmentAdd: document.getElementById("assignment-add") as HTMLButtonElement,
-  assignmentRemove: document.getElementById("assignment-remove") as HTMLButtonElement,
-  assignmentCount: document.getElementById("assignment-count") as HTMLSpanElement,
-  assignmentSelectAll: document.getElementById("assignment-select-all") as HTMLButtonElement,
-  assignmentClear: document.getElementById("assignment-clear") as HTMLButtonElement,
-  assignmentStatus: document.getElementById("assignment-status") as HTMLDivElement,
-  assignmentTableBody: document.getElementById("assignment-table-body") as HTMLTableSectionElement,
+  assignmentRemove: document.getElementById(
+    "assignment-remove",
+  ) as HTMLButtonElement,
+  assignmentCount: document.getElementById(
+    "assignment-count",
+  ) as HTMLSpanElement,
+  assignmentSelectAll: document.getElementById(
+    "assignment-select-all",
+  ) as HTMLButtonElement,
+  assignmentClear: document.getElementById(
+    "assignment-clear",
+  ) as HTMLButtonElement,
+  assignmentStatus: document.getElementById(
+    "assignment-status",
+  ) as HTMLDivElement,
+  assignmentTableBody: document.getElementById(
+    "assignment-table-body",
+  ) as HTMLTableSectionElement,
   assignmentSortButtons: Array.from(
     document.querySelectorAll("[data-assign-sort]"),
   ) as HTMLButtonElement[],
-  assignmentFilterAssigned: document.getElementById("assignment-filter-assigned") as HTMLSelectElement,
-  assignmentSearch: document.getElementById("assignment-search") as HTMLInputElement,
-  controlsPrivileges: document.getElementById("controls-privileges") as HTMLDivElement,
-  controlsAssignments: document.getElementById("controls-assignments") as HTMLDivElement,
-  controlsDashboard: document.getElementById("controls-dashboard") as HTMLDivElement,
-  dashboardUserStatus: document.getElementById("dashboard-user-status") as HTMLSelectElement,
-  dashboardUserType: document.getElementById("dashboard-user-type") as HTMLSelectElement,
-  dashboardBusinessUnitSelect: document.getElementById("dashboard-bu-select") as HTMLSelectElement,
-  dashboardRoleSelect: document.getElementById("dashboard-role-select") as HTMLSelectElement,
-  dashboardTeamSelect: document.getElementById("dashboard-team-select") as HTMLSelectElement,
-  dashboardExport: document.getElementById("dashboard-export") as HTMLButtonElement,
-  dashboardLoading: document.getElementById("dashboard-loading") as HTMLDivElement,
-  dashboardLoadingBar: document.getElementById("dashboard-loading-bar") as HTMLDivElement,
-  dashboardLoadingText: document.getElementById("dashboard-loading-text") as HTMLDivElement,
+  assignmentFilterAssigned: document.getElementById(
+    "assignment-filter-assigned",
+  ) as HTMLSelectElement,
+  assignmentSearch: document.getElementById(
+    "assignment-search",
+  ) as HTMLInputElement,
+  privilegeSearch: document.getElementById(
+    "privilege-search",
+  ) as HTMLInputElement,
+  controlsPrivileges: document.getElementById(
+    "controls-privileges",
+  ) as HTMLDivElement,
+  controlsAssignments: document.getElementById(
+    "controls-assignments",
+  ) as HTMLDivElement,
+  controlsDashboard: document.getElementById(
+    "controls-dashboard",
+  ) as HTMLDivElement,
+  dashboardUserStatus: document.getElementById(
+    "dashboard-user-status",
+  ) as HTMLSelectElement,
+  dashboardUserType: document.getElementById(
+    "dashboard-user-type",
+  ) as HTMLSelectElement,
+  dashboardBusinessUnitSelect: document.getElementById(
+    "dashboard-bu-select",
+  ) as HTMLSelectElement,
+  dashboardRoleSelect: document.getElementById(
+    "dashboard-role-select",
+  ) as HTMLSelectElement,
+  dashboardTeamSelect: document.getElementById(
+    "dashboard-team-select",
+  ) as HTMLSelectElement,
+  dashboardExport: document.getElementById(
+    "dashboard-export",
+  ) as HTMLButtonElement,
+  dashboardLoading: document.getElementById(
+    "dashboard-loading",
+  ) as HTMLDivElement,
+  dashboardLoadingBar: document.getElementById(
+    "dashboard-loading-bar",
+  ) as HTMLDivElement,
+  dashboardLoadingText: document.getElementById(
+    "dashboard-loading-text",
+  ) as HTMLDivElement,
   dashboardChartCards: Array.from(
     document.querySelectorAll("[data-dashboard-chart]"),
   ) as HTMLDivElement[],
@@ -224,38 +313,84 @@ const elements = {
     document.querySelectorAll(".chart-expand"),
   ) as HTMLButtonElement[],
   chartModal: document.getElementById("chart-modal") as HTMLDivElement,
-  chartModalTitle: document.getElementById("chart-modal-title") as HTMLHeadingElement,
-  chartModalCanvas: document.getElementById("chart-modal-canvas") as HTMLCanvasElement,
-  chartModalClose: document.getElementById("chart-modal-close") as HTMLButtonElement,
-  chartModalBackdrop: document.querySelector("[data-modal-close='true']") as HTMLDivElement,
+  chartModalTitle: document.getElementById(
+    "chart-modal-title",
+  ) as HTMLHeadingElement,
+  chartModalCanvas: document.getElementById(
+    "chart-modal-canvas",
+  ) as HTMLCanvasElement,
+  chartModalClose: document.getElementById(
+    "chart-modal-close",
+  ) as HTMLButtonElement,
+  chartModalBackdrop: document.querySelector(
+    "[data-modal-close='true']",
+  ) as HTMLDivElement,
   chartModalBody: document.querySelector(".modal-body") as HTMLDivElement,
-  metricHumanActive: document.getElementById("metric-human-active") as HTMLDivElement,
-  metricHumanInactive: document.getElementById("metric-human-inactive") as HTMLDivElement,
-  metricAppActive: document.getElementById("metric-app-active") as HTMLDivElement,
-  metricAppInactive: document.getElementById("metric-app-inactive") as HTMLDivElement,
-  metricCustomRoles: document.getElementById("metric-custom-roles") as HTMLDivElement,
-  metricManagedRoles: document.getElementById("metric-managed-roles") as HTMLDivElement,
-  metricRolesWithoutUsers: document.getElementById("metric-roles-without-users") as HTMLDivElement,
-  metricTotalTeams: document.getElementById("metric-total-teams") as HTMLDivElement,
-  chartUsersByRole: document.getElementById("chart-users-by-role") as HTMLCanvasElement,
-  chartTeamsByRole: document.getElementById("chart-teams-by-role") as HTMLCanvasElement,
-  chartUsersByBusinessUnit: document.getElementById("chart-users-by-bu") as HTMLCanvasElement,
-  chartUsersByTeam: document.getElementById("chart-users-by-team") as HTMLCanvasElement,
+  metricHumanActive: document.getElementById(
+    "metric-human-active",
+  ) as HTMLDivElement,
+  metricHumanInactive: document.getElementById(
+    "metric-human-inactive",
+  ) as HTMLDivElement,
+  metricAppActive: document.getElementById(
+    "metric-app-active",
+  ) as HTMLDivElement,
+  metricAppInactive: document.getElementById(
+    "metric-app-inactive",
+  ) as HTMLDivElement,
+  metricCustomRoles: document.getElementById(
+    "metric-custom-roles",
+  ) as HTMLDivElement,
+  metricManagedRoles: document.getElementById(
+    "metric-managed-roles",
+  ) as HTMLDivElement,
+  metricRolesWithoutUsers: document.getElementById(
+    "metric-roles-without-users",
+  ) as HTMLDivElement,
+  metricTotalTeams: document.getElementById(
+    "metric-total-teams",
+  ) as HTMLDivElement,
+  chartUsersByRole: document.getElementById(
+    "chart-users-by-role",
+  ) as HTMLCanvasElement,
+  chartTeamsByRole: document.getElementById(
+    "chart-teams-by-role",
+  ) as HTMLCanvasElement,
+  chartUsersByBusinessUnit: document.getElementById(
+    "chart-users-by-bu",
+  ) as HTMLCanvasElement,
+  chartUsersByTeam: document.getElementById(
+    "chart-users-by-team",
+  ) as HTMLCanvasElement,
   applyBtn: document.getElementById("apply-btn") as HTMLButtonElement,
   undoBtn: document.getElementById("undo-btn") as HTMLButtonElement,
   refreshBtn: document.getElementById("refresh-btn") as HTMLButtonElement,
   pendingCount: document.getElementById("pending-count") as HTMLSpanElement,
   tableTitle: document.getElementById("table-title") as HTMLHeadingElement,
-  privilegesTable: document.querySelector("#privileges-table tbody") as HTMLTableSectionElement,
-  privilegesTableRoot: document.getElementById("privileges-table") as HTMLTableElement,
+  privilegesTable: document.querySelector(
+    "#privileges-table tbody",
+  ) as HTMLTableSectionElement,
+  privilegesTableRoot: document.getElementById(
+    "privileges-table",
+  ) as HTMLTableElement,
   tableLoading: document.getElementById("table-loading") as HTMLDivElement,
   tableEmpty: document.getElementById("table-empty") as HTMLDivElement,
   loadingBar: document.getElementById("loading-bar") as HTMLDivElement,
   loadingText: document.getElementById("loading-text") as HTMLDivElement,
   log: document.getElementById("log") as HTMLPreElement,
   themeToggle: document.getElementById("theme-toggle") as HTMLButtonElement,
-  sortButtons: Array.from(document.querySelectorAll(".sort-button")) as HTMLButtonElement[],
-  filterSelects: Array.from(document.querySelectorAll(".filter-select")) as HTMLSelectElement[],
+  sortButtons: Array.from(
+    document.querySelectorAll(".sort-button"),
+  ) as HTMLButtonElement[],
+  bulkSelects: Array.from(
+    document.querySelectorAll("[data-bulk-select]"),
+  ) as HTMLSelectElement[],
+  bulkApplyButtons: Array.from(
+    document.querySelectorAll("[data-bulk-apply]"),
+  ) as HTMLButtonElement[],
+  filterSelects: Array.from(
+    document.querySelectorAll(".filter-select"),
+  ) as HTMLSelectElement[],
 };
 
 initLogger(elements.log);
@@ -406,7 +541,11 @@ function setDashboardLoading(active: boolean, message?: string) {
   }
 }
 
-function setDashboardLoadingProgress(step: number, total: number, message: string) {
+function setDashboardLoadingProgress(
+  step: number,
+  total: number,
+  message: string,
+) {
   if (elements.dashboardLoadingText) {
     elements.dashboardLoadingText.textContent = `${message} (${step}/${total})`;
   }
@@ -495,7 +634,11 @@ function applyRoleFilterToUi() {
     (item) => item.name,
   );
 
-  if (state.filterMode === "role" && state.roles.length > 0 && !elements.roleSelect.value) {
+  if (
+    state.filterMode === "role" &&
+    state.roles.length > 0 &&
+    !elements.roleSelect.value
+  ) {
     elements.roleSelect.value = state.roles[0].id;
   }
   if (state.cacheLoaded) {
@@ -517,14 +660,18 @@ function applyRoleFilterToUi() {
 
 function setLoading(active: boolean, message?: string) {
   state.loading.active = active;
+  const hasLoadedData = state.cacheLoaded;
   if (elements.tableLoading) {
     elements.tableLoading.classList.toggle("hidden", !active);
   }
   if (elements.privilegesTableRoot) {
-    elements.privilegesTableRoot.classList.toggle("hidden", active);
+    elements.privilegesTableRoot.classList.toggle(
+      "hidden",
+      active || !hasLoadedData,
+    );
   }
   if (elements.tableEmpty) {
-    elements.tableEmpty.classList.toggle("hidden", active || state.cacheLoaded);
+    elements.tableEmpty.classList.toggle("hidden", active || hasLoadedData);
   }
   if (message && elements.loadingText) {
     elements.loadingText.textContent = message;
@@ -534,7 +681,11 @@ function setLoading(active: boolean, message?: string) {
   }
 }
 
-function updateLoadingProgress(loaded: number, total: number, message?: string) {
+function updateLoadingProgress(
+  loaded: number,
+  total: number,
+  message?: string,
+) {
   state.loading.loaded = loaded;
   state.loading.total = total;
   const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
@@ -543,11 +694,20 @@ function updateLoadingProgress(loaded: number, total: number, message?: string) 
   }
   if (elements.loadingText) {
     const status = formatLoadingStatus(loaded, total);
-    elements.loadingText.textContent = message ? `${message} (${status})` : status;
+    elements.loadingText.textContent = message
+      ? `${message} (${status})`
+      : status;
   }
 }
 
-function renderSelectOptions<T extends { id?: string; logicalName?: string; name?: string; displayName?: string }>(
+function renderSelectOptions<
+  T extends {
+    id?: string;
+    logicalName?: string;
+    name?: string;
+    displayName?: string;
+  },
+>(
   select: HTMLSelectElement,
   items: T[],
   getValue: (item: T) => string,
@@ -562,7 +722,14 @@ function renderSelectOptions<T extends { id?: string; logicalName?: string; name
   }
 }
 
-function renderSelectOptionsWithSelection<T extends { id?: string; logicalName?: string; name?: string; displayName?: string }>(
+function renderSelectOptionsWithSelection<
+  T extends {
+    id?: string;
+    logicalName?: string;
+    name?: string;
+    displayName?: string;
+  },
+>(
   select: HTMLSelectElement,
   items: T[],
   getValue: (item: T) => string,
@@ -575,7 +742,14 @@ function renderSelectOptionsWithSelection<T extends { id?: string; logicalName?:
   }
 }
 
-function renderSelectOptionsWithAll<T extends { id?: string; logicalName?: string; name?: string; displayName?: string }>(
+function renderSelectOptionsWithAll<
+  T extends {
+    id?: string;
+    logicalName?: string;
+    name?: string;
+    displayName?: string;
+  },
+>(
   select: HTMLSelectElement,
   items: T[],
   getValue: (item: T) => string,
@@ -610,10 +784,16 @@ function setTab(tab: "privileges" | "assignments" | "dashboard") {
     elements.tabDashboard.classList.toggle("hidden", tab !== "dashboard");
   }
   if (elements.controlsPrivileges) {
-    elements.controlsPrivileges.classList.toggle("hidden", tab !== "privileges");
+    elements.controlsPrivileges.classList.toggle(
+      "hidden",
+      tab !== "privileges",
+    );
   }
   if (elements.controlsAssignments) {
-    elements.controlsAssignments.classList.toggle("hidden", tab !== "assignments");
+    elements.controlsAssignments.classList.toggle(
+      "hidden",
+      tab !== "assignments",
+    );
   }
   if (elements.controlsDashboard) {
     elements.controlsDashboard.classList.toggle("hidden", tab !== "dashboard");
@@ -693,12 +873,15 @@ function applyAssignmentSortAndFilter(items: AssignmentItem[]) {
 
   return [...filtered].sort((a, b) => {
     if (state.assignmentSort.column === "label") {
-      const cmp = a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
+      const cmp = a.label.localeCompare(b.label, undefined, {
+        sensitivity: "base",
+      });
       return state.assignmentSort.direction === "asc" ? cmp : -cmp;
     }
     const aRank = a.assigned ? 1 : 2;
     const bRank = b.assigned ? 1 : 2;
-    const diff = state.assignmentSort.direction === "asc" ? aRank - bRank : bRank - aRank;
+    const diff =
+      state.assignmentSort.direction === "asc" ? aRank - bRank : bRank - aRank;
     if (diff !== 0) {
       return diff;
     }
@@ -733,7 +916,9 @@ function renderAssignmentTable(items: AssignmentItem[]) {
     const statusCell = document.createElement("td");
     const status = document.createElement("div");
     status.className = "assignment-status-pill";
-    status.textContent = item.assigned ? UI_TEXT.statusAssigned : UI_TEXT.statusNotAssigned;
+    status.textContent = item.assigned
+      ? UI_TEXT.statusAssigned
+      : UI_TEXT.statusNotAssigned;
     statusCell.appendChild(status);
 
     const selectCell = document.createElement("td");
@@ -850,13 +1035,178 @@ function updateSortIndicators() {
   for (const button of elements.sortButtons) {
     button.classList.remove("sort-asc", "sort-desc");
     if (button.dataset.sort === state.sort.column) {
-      button.classList.add(state.sort.direction === "asc" ? "sort-asc" : "sort-desc");
+      button.classList.add(
+        state.sort.direction === "asc" ? "sort-asc" : "sort-desc",
+      );
     }
   }
 }
 
-function isPrivilegeAvailable(row: PrivilegeRow, privilege: AccessRight): boolean {
-  return Boolean(state.privilegeIdByKey.get(`${row.entityLogicalName}:${privilege}`));
+function isPrivilegeAvailable(
+  row: PrivilegeRow,
+  privilege: AccessRight,
+): boolean {
+  return Boolean(
+    state.privilegeIdByKey.get(`${row.entityLogicalName}:${privilege}`),
+  );
+}
+
+function getAllowedLevelsForPrivilege(
+  row: PrivilegeRow,
+  privilege: AccessRight,
+): PrivilegeLevel[] {
+  const privilegeId = state.privilegeIdByKey.get(
+    `${row.entityLogicalName}:${privilege}`,
+  );
+  if (!privilegeId) {
+    return [];
+  }
+
+  const info = state.privilegeInfoById.get(privilegeId);
+  const allowedLevels: PrivilegeLevel[] = ["none"];
+  if (info?.canBeBasic) {
+    allowedLevels.push("user");
+  }
+  if (info?.canBeLocal) {
+    allowedLevels.push("businessUnit");
+  }
+  if (info?.canBeDeep) {
+    allowedLevels.push("parentChild");
+  }
+  if (info?.canBeGlobal) {
+    allowedLevels.push("organization");
+  }
+
+  return allowedLevels;
+}
+
+function getRoleIdForVisibleRow(
+  row: PrivilegeRow,
+  isRoleMode: boolean,
+): string | undefined {
+  if (isRoleMode) {
+    return elements.roleSelect.value || undefined;
+  }
+  return row.roleId;
+}
+
+function renderBulkControls(rows: PrivilegeRow[], isRoleMode: boolean) {
+  const selectByPrivilege = new Map<AccessRight, HTMLSelectElement>();
+  for (const select of elements.bulkSelects) {
+    const privilege = select.dataset.bulkSelect as AccessRight | undefined;
+    if (!privilege) {
+      continue;
+    }
+    selectByPrivilege.set(privilege, select);
+  }
+
+  const buttonByPrivilege = new Map<AccessRight, HTMLButtonElement>();
+  for (const button of elements.bulkApplyButtons) {
+    const privilege = button.dataset.bulkApply as AccessRight | undefined;
+    if (!privilege) {
+      continue;
+    }
+    buttonByPrivilege.set(privilege, button);
+  }
+
+  for (const privilege of accessRights) {
+    const select = selectByPrivilege.get(privilege);
+    const button = buttonByPrivilege.get(privilege);
+    if (!select || !button) {
+      continue;
+    }
+
+    const allowedLevels = new Set<PrivilegeLevel>();
+    let hasEditableVisibleRows = false;
+
+    for (const row of rows) {
+      const roleId = getRoleIdForVisibleRow(row, isRoleMode);
+      if (!roleId) {
+        continue;
+      }
+      const rowAllowedLevels = getAllowedLevelsForPrivilege(row, privilege);
+      if (rowAllowedLevels.length === 0) {
+        continue;
+      }
+      hasEditableVisibleRows = true;
+      for (const level of rowAllowedLevels) {
+        allowedLevels.add(level);
+      }
+    }
+
+    select.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = UI_TEXT.bulkUpdateSelect;
+    select.appendChild(placeholder);
+
+    for (const optionMeta of levelOptions) {
+      if (!allowedLevels.has(optionMeta.level)) {
+        continue;
+      }
+      const option = document.createElement("option");
+      option.value = optionMeta.level;
+      option.textContent = `${optionMeta.icon} ${optionMeta.label}`;
+      select.appendChild(option);
+    }
+
+    select.disabled = !hasEditableVisibleRows;
+    button.disabled = !hasEditableVisibleRows;
+    button.textContent = UI_TEXT.bulkUpdateApply;
+    button.title = hasEditableVisibleRows
+      ? UI_TEXT.bulkUpdateApply
+      : UI_TEXT.bulkUpdateNoRights;
+  }
+}
+
+function applyBulkUpdate(privilege: AccessRight, level: PrivilegeLevel) {
+  const isRoleMode = state.tableMode === "role";
+  const visibleRows = applySortAndFilters(state.privilegeRows);
+  let updatedCount = 0;
+  let skippedCount = 0;
+
+  for (const row of visibleRows) {
+    const roleId = getRoleIdForVisibleRow(row, isRoleMode);
+    if (!roleId) {
+      skippedCount++;
+      continue;
+    }
+
+    const allowedLevels = getAllowedLevelsForPrivilege(row, privilege);
+    if (allowedLevels.length === 0 || !allowedLevels.includes(level)) {
+      skippedCount++;
+      continue;
+    }
+
+    const changed = updatePendingChange(
+      roleId,
+      row.entityLogicalName,
+      privilege,
+      level,
+    );
+    if (changed) {
+      updatedCount++;
+    }
+  }
+
+  const privilegeLabel = privilegeLabels[privilege] ?? privilege;
+  const levelLabel =
+    levelOptions.find((option) => option.level === level)?.label ?? level;
+
+  if (updatedCount > 0) {
+    logMessage(
+      formatBulkUpdatedVisible(
+        privilegeLabel,
+        levelLabel,
+        updatedCount,
+        skippedCount,
+      ),
+    );
+  } else {
+    logMessage(formatBulkUpdateNoRows(privilegeLabel));
+  }
+
+  renderPrivilegeTable();
 }
 
 function hasAnyRights(row: PrivilegeRow): boolean {
@@ -897,11 +1247,17 @@ function updatePendingChange(
   privilege: AccessRight,
   level: PrivilegeLevel,
 ): boolean {
-  const currentLevel = getCurrentPrivilegeLevel(roleId, entityLogicalName, privilege);
+  const currentLevel = getCurrentPrivilegeLevel(
+    roleId,
+    entityLogicalName,
+    privilege,
+  );
   const existing = findPendingChange(roleId, entityLogicalName, privilege);
   if (level === currentLevel) {
     if (existing) {
-      state.pendingChanges = state.pendingChanges.filter((change) => change !== existing);
+      state.pendingChanges = state.pendingChanges.filter(
+        (change) => change !== existing,
+      );
     }
     updatePendingUi();
     return false;
@@ -924,7 +1280,11 @@ function setPendingClass(select: HTMLSelectElement, isPending: boolean) {
   select.classList.toggle("pending-change", isPending);
 }
 
-function getPrivilegeSortRank(level: PrivilegeLevel, available: boolean, direction: SortDirection): number {
+function getPrivilegeSortRank(
+  level: PrivilegeLevel,
+  available: boolean,
+  direction: SortDirection,
+): number {
   if (!available) {
     return 99;
   }
@@ -947,6 +1307,16 @@ function getPrivilegeSortRank(level: PrivilegeLevel, available: boolean, directi
 
 function applySortAndFilters(rows: PrivilegeRow[]): PrivilegeRow[] {
   const filtered = rows.filter((row) => {
+    if (state.privilegeSearch) {
+      const term = state.privilegeSearch.toLowerCase();
+      const labelMatch = row.entityLabel.toLowerCase().includes(term);
+      const logicalNameMatch = row.entityLogicalName
+        .toLowerCase()
+        .includes(term);
+      if (!labelMatch && !logicalNameMatch) {
+        return false;
+      }
+    }
     if (state.rightsFilter === "with" && !hasAnyRights(row)) {
       return false;
     }
@@ -977,18 +1347,30 @@ function applySortAndFilters(rows: PrivilegeRow[]): PrivilegeRow[] {
 
   const sorted = [...filtered].sort((a, b) => {
     if (state.sort.column === "label") {
-      const cmp = a.entityLabel.localeCompare(b.entityLabel, undefined, { sensitivity: "base" });
+      const cmp = a.entityLabel.localeCompare(b.entityLabel, undefined, {
+        sensitivity: "base",
+      });
       return state.sort.direction === "asc" ? cmp : -cmp;
     }
     const privilege = state.sort.column;
     const aAvailable = isPrivilegeAvailable(a, privilege);
     const bAvailable = isPrivilegeAvailable(b, privilege);
-    const aRank = getPrivilegeSortRank(a[privilege], aAvailable, state.sort.direction);
-    const bRank = getPrivilegeSortRank(b[privilege], bAvailable, state.sort.direction);
+    const aRank = getPrivilegeSortRank(
+      a[privilege],
+      aAvailable,
+      state.sort.direction,
+    );
+    const bRank = getPrivilegeSortRank(
+      b[privilege],
+      bAvailable,
+      state.sort.direction,
+    );
     if (aRank !== bRank) {
       return aRank - bRank;
     }
-    return a.entityLabel.localeCompare(b.entityLabel, undefined, { sensitivity: "base" });
+    return a.entityLabel.localeCompare(b.entityLabel, undefined, {
+      sensitivity: "base",
+    });
   });
 
   return sorted;
@@ -998,6 +1380,7 @@ function renderPrivilegeTable() {
   elements.privilegesTable.innerHTML = "";
   const isRoleMode = state.tableMode === "role";
   const rows = applySortAndFilters(state.privilegeRows);
+  renderBulkControls(rows, isRoleMode);
 
   if (elements.tableEmpty) {
     elements.tableEmpty.classList.toggle("hidden", state.cacheLoaded);
@@ -1026,27 +1409,16 @@ function renderPrivilegeTable() {
 
     for (const privilege of accessRights) {
       const td = document.createElement("td");
-      const privilegeId = state.privilegeIdByKey.get(`${row.entityLogicalName}:${privilege}`);
+      const privilegeId = state.privilegeIdByKey.get(
+        `${row.entityLogicalName}:${privilege}`,
+      );
       if (!privilegeId) {
         td.textContent = UI_TEXT.tableCellEmpty;
         tr.appendChild(td);
         continue;
       }
 
-      const info = state.privilegeInfoById.get(privilegeId);
-      const allowedLevels: PrivilegeLevel[] = ["none"];
-      if (info?.canBeBasic) {
-        allowedLevels.push("user");
-      }
-      if (info?.canBeLocal) {
-        allowedLevels.push("businessUnit");
-      }
-      if (info?.canBeDeep) {
-        allowedLevels.push("parentChild");
-      }
-      if (info?.canBeGlobal) {
-        allowedLevels.push("organization");
-      }
+      const allowedLevels = getAllowedLevelsForPrivilege(row, privilege);
 
       const select = document.createElement("select");
       select.className = "level-select";
@@ -1057,6 +1429,14 @@ function renderPrivilegeTable() {
       } else if (row.roleId) {
         select.dataset.roleId = row.roleId;
       }
+      const pending = select.dataset.roleId
+        ? findPendingChange(
+            select.dataset.roleId,
+            row.entityLogicalName,
+            privilege,
+          )
+        : undefined;
+      const effectiveLevel = pending?.level ?? row[privilege];
       for (const optionMeta of levelOptions) {
         if (!allowedLevels.includes(optionMeta.level)) {
           continue;
@@ -1066,7 +1446,7 @@ function renderPrivilegeTable() {
         option.textContent = `${optionMeta.icon} ${optionMeta.label}`;
         option.className = optionMeta.className;
         option.style.color = getLevelColor(optionMeta.level);
-        if (row[privilege] === optionMeta.level) {
+        if (effectiveLevel === optionMeta.level) {
           option.selected = true;
         }
         select.appendChild(option);
@@ -1077,7 +1457,12 @@ function renderPrivilegeTable() {
           return;
         }
         const level = select.value as PrivilegeLevel;
-        const isPending = updatePendingChange(roleId, row.entityLogicalName, privilege, level);
+        const isPending = updatePendingChange(
+          roleId,
+          row.entityLogicalName,
+          privilege,
+          level,
+        );
         setPendingClass(select, isPending);
       });
       select.disabled = !isRoleMode && !row.roleId;
@@ -1085,12 +1470,7 @@ function renderPrivilegeTable() {
       select.addEventListener("change", () => {
         applyLevelClass(select, select.value as PrivilegeLevel);
       });
-      if (select.dataset.roleId) {
-        const pending = Boolean(
-          findPendingChange(select.dataset.roleId, row.entityLogicalName, privilege),
-        );
-        setPendingClass(select, pending);
-      }
+      setPendingClass(select, Boolean(pending));
       td.appendChild(select);
       tr.appendChild(td);
     }
@@ -1152,7 +1532,8 @@ async function loadEntities() {
     .filter((entity: any) => entity.LogicalName)
     .map((entity: any) => ({
       logicalName: entity.LogicalName,
-      displayName: entity.DisplayName?.UserLocalizedLabel?.Label ?? entity.LogicalName,
+      displayName:
+        entity.DisplayName?.UserLocalizedLabel?.Label ?? entity.LogicalName,
       ownershipLabel: mapOwnershipLabel(entity.OwnershipType),
     }));
   renderSelectOptions(
@@ -1185,7 +1566,10 @@ async function loadTeams() {
   state.teamsLoaded = true;
 }
 
-async function resolveRoleForUser(rootRoleId: string, businessUnitId: string): Promise<string | null> {
+async function resolveRoleForUser(
+  rootRoleId: string,
+  businessUnitId: string,
+): Promise<string | null> {
   if (!businessUnitId) {
     return null;
   }
@@ -1201,7 +1585,10 @@ async function resolveRoleForUser(rootRoleId: string, businessUnitId: string): P
   return roleId;
 }
 
-async function resolveRoleForTeam(rootRoleId: string, businessUnitId: string): Promise<string | null> {
+async function resolveRoleForTeam(
+  rootRoleId: string,
+  businessUnitId: string,
+): Promise<string | null> {
   if (!businessUnitId) {
     return null;
   }
@@ -1319,7 +1706,9 @@ function applyLevelClass(select: HTMLSelectElement, level: PrivilegeLevel) {
   select.classList.add(`level-${level}`);
 }
 
-function mapAccessFromName(name: string): { access: AccessRight; entityLogicalName: string } | null {
+function mapAccessFromName(
+  name: string,
+): { access: AccessRight; entityLogicalName: string } | null {
   const prefixes: Array<{ prefix: string; access: AccessRight }> = [
     { prefix: "prvCreate", access: "create" },
     { prefix: "prvRead", access: "read" },
@@ -1328,6 +1717,7 @@ function mapAccessFromName(name: string): { access: AccessRight; entityLogicalNa
     { prefix: "prvAppendTo", access: "appendto" },
     { prefix: "prvAppend", access: "append" },
     { prefix: "prvAssign", access: "assign" },
+    { prefix: "prvShare", access: "share" },
   ];
 
   for (const { prefix, access } of prefixes) {
@@ -1359,6 +1749,7 @@ function ensureRolePrivilegeRecord(
       append: "none",
       appendto: "none",
       assign: "none",
+      share: "none",
     });
   }
   return roleMap.get(entityLogicalName)!;
@@ -1380,7 +1771,8 @@ async function loadRoleAssignmentCounts(
   if (kind === "users") {
     await ensureUserRoleAssignmentsLoaded();
     for (const role of roles) {
-      const assigned = state.assignmentUsersByRole.get(role.id) ?? new Set<string>();
+      const assigned =
+        state.assignmentUsersByRole.get(role.id) ?? new Set<string>();
       if (!activeUserIds) {
         counts.set(role.id, assigned.size);
         continue;
@@ -1398,7 +1790,8 @@ async function loadRoleAssignmentCounts(
 
   await ensureTeamRoleAssignmentsLoaded();
   for (const role of roles) {
-    const assigned = state.assignmentTeamsByRole.get(role.id) ?? new Set<string>();
+    const assigned =
+      state.assignmentTeamsByRole.get(role.id) ?? new Set<string>();
     counts.set(role.id, assigned.size);
   }
   return counts;
@@ -1422,49 +1815,81 @@ async function loadTeamAssignmentCounts(): Promise<Map<string, number>> {
   return counts;
 }
 
-function renderAssignmentRoleOptionsWithCounts(unitLabel: string, counts: Map<string, number>) {
+function renderAssignmentRoleOptionsWithCounts(
+  unitLabel: string,
+  counts: Map<string, number>,
+) {
   renderSelectOptionsWithSelection(
     elements.assignmentRoleSelect,
     state.roles,
     (item) => item.id,
-    (item) => formatAssignmentSelectLabel(item.name, counts.get(item.id) ?? 0, unitLabel),
+    (item) =>
+      formatAssignmentSelectLabel(
+        item.name,
+        counts.get(item.id) ?? 0,
+        unitLabel,
+      ),
   );
 }
 
-function renderAssignmentUserOptionsWithCounts(unitLabel: string, counts: Map<string, number>) {
+function renderAssignmentUserOptionsWithCounts(
+  unitLabel: string,
+  counts: Map<string, number>,
+) {
   renderSelectOptionsWithSelection(
     elements.assignmentUserSelect,
     state.users,
     (item) => item.id,
-    (item) => formatAssignmentSelectLabel(item.name, counts.get(item.id) ?? 0, unitLabel),
+    (item) =>
+      formatAssignmentSelectLabel(
+        item.name,
+        counts.get(item.id) ?? 0,
+        unitLabel,
+      ),
   );
 }
 
-function renderAssignmentTeamOptionsWithCounts(unitLabel: string, counts: Map<string, number>) {
+function renderAssignmentTeamOptionsWithCounts(
+  unitLabel: string,
+  counts: Map<string, number>,
+) {
   renderSelectOptionsWithSelection(
     elements.assignmentTeamSelect,
     state.teams,
     (item) => item.id,
-    (item) => formatAssignmentSelectLabel(item.name, counts.get(item.id) ?? 0, unitLabel),
+    (item) =>
+      formatAssignmentSelectLabel(
+        item.name,
+        counts.get(item.id) ?? 0,
+        unitLabel,
+      ),
   );
 }
 
-async function getAssignedUsersForRoleCached(roleId: string): Promise<Set<string>> {
+async function getAssignedUsersForRoleCached(
+  roleId: string,
+): Promise<Set<string>> {
   await ensureUserRoleAssignmentsLoaded();
   return state.assignmentUsersByRole.get(roleId) ?? new Set();
 }
 
-async function getAssignedRolesForUserCached(userId: string): Promise<Set<string>> {
+async function getAssignedRolesForUserCached(
+  userId: string,
+): Promise<Set<string>> {
   await ensureUserRoleAssignmentsLoaded();
   return state.assignmentRolesByUser.get(userId) ?? new Set();
 }
 
-async function getAssignedTeamsForRoleCached(roleId: string): Promise<Set<string>> {
+async function getAssignedTeamsForRoleCached(
+  roleId: string,
+): Promise<Set<string>> {
   await ensureTeamRoleAssignmentsLoaded();
   return state.assignmentTeamsByRole.get(roleId) ?? new Set();
 }
 
-async function getAssignedRolesForTeamCached(teamId: string): Promise<Set<string>> {
+async function getAssignedRolesForTeamCached(
+  teamId: string,
+): Promise<Set<string>> {
   await ensureTeamRoleAssignmentsLoaded();
   return state.assignmentRolesByTeam.get(teamId) ?? new Set();
 }
@@ -1493,7 +1918,11 @@ async function ensureDashboardDataLoaded() {
         state.teamsLoaded ? Promise.resolve() : loadTeams(),
       ]);
 
-      setDashboardLoadingProgress(++currentStep, totalSteps, UI_TEXT.loadingDashboardPeople);
+      setDashboardLoadingProgress(
+        ++currentStep,
+        totalSteps,
+        UI_TEXT.loadingDashboardPeople,
+      );
       const [users, businessUnits, teamMemberships] = await Promise.all([
         loadUsersForDashboard(),
         loadBusinessUnits(),
@@ -1510,7 +1939,9 @@ async function ensureDashboardDataLoaded() {
       );
       if (state.assignmentRoleUserCounts.size !== state.allRoles.length) {
         const activeUserIds = new Set(
-          state.dashboardUsers.filter((user) => isActiveUser(user)).map((user) => user.id),
+          state.dashboardUsers
+            .filter((user) => isActiveUser(user))
+            .map((user) => user.id),
         );
         state.assignmentRoleUserCounts = await loadRoleAssignmentCounts(
           "users",
@@ -1584,7 +2015,7 @@ function buildFilteredDashboardUsers(): DashboardUser[] {
     );
   }
   const roleUserIds = roleFilterId
-    ? state.assignmentUsersByRole.get(roleFilterId) ?? new Set<string>()
+    ? (state.assignmentUsersByRole.get(roleFilterId) ?? new Set<string>())
     : null;
   return state.dashboardUsers.filter((user) => {
     const active = isActiveUser(user);
@@ -1681,7 +2112,8 @@ function buildRoleUserTypeChartData(
   const roleHuman = new Map<string, number>();
   const roleApp = new Map<string, number>();
   for (const role of roles) {
-    const assigned = state.assignmentUsersByRole.get(role.id) ?? new Set<string>();
+    const assigned =
+      state.assignmentUsersByRole.get(role.id) ?? new Set<string>();
     let humanCount = 0;
     let appCount = 0;
     for (const userId of assigned) {
@@ -1744,7 +2176,10 @@ function buildRoleTotalChartData(
   };
 }
 
-function buildUsersByBusinessUnitData(filteredUsers: DashboardUser[], maxRoles: number | null) {
+function buildUsersByBusinessUnitData(
+  filteredUsers: DashboardUser[],
+  maxRoles: number | null,
+) {
   const humanCounts = new Map<string, number>();
   const appCounts = new Map<string, number>();
   for (const user of filteredUsers) {
@@ -1752,9 +2187,15 @@ function buildUsersByBusinessUnitData(filteredUsers: DashboardUser[], maxRoles: 
       continue;
     }
     if (isApplicationUser(user)) {
-      appCounts.set(user.businessUnitId, (appCounts.get(user.businessUnitId) ?? 0) + 1);
+      appCounts.set(
+        user.businessUnitId,
+        (appCounts.get(user.businessUnitId) ?? 0) + 1,
+      );
     } else {
-      humanCounts.set(user.businessUnitId, (humanCounts.get(user.businessUnitId) ?? 0) + 1);
+      humanCounts.set(
+        user.businessUnitId,
+        (humanCounts.get(user.businessUnitId) ?? 0) + 1,
+      );
     }
   }
   const units = state.dashboardBusinessUnits
@@ -1772,7 +2213,10 @@ function buildUsersByBusinessUnitData(filteredUsers: DashboardUser[], maxRoles: 
   };
 }
 
-function buildUsersByTeamData(filteredUsers: DashboardUser[], maxRoles: number | null) {
+function buildUsersByTeamData(
+  filteredUsers: DashboardUser[],
+  maxRoles: number | null,
+) {
   const humanIds = new Set<string>();
   const appIds = new Set<string>();
   for (const user of filteredUsers) {
@@ -1787,11 +2231,17 @@ function buildUsersByTeamData(filteredUsers: DashboardUser[], maxRoles: number |
   const appCounts = new Map<string, number>();
   for (const membership of state.dashboardTeamMemberships) {
     if (humanIds.has(membership.userId)) {
-      humanCounts.set(membership.teamId, (humanCounts.get(membership.teamId) ?? 0) + 1);
+      humanCounts.set(
+        membership.teamId,
+        (humanCounts.get(membership.teamId) ?? 0) + 1,
+      );
       continue;
     }
     if (appIds.has(membership.userId)) {
-      appCounts.set(membership.teamId, (appCounts.get(membership.teamId) ?? 0) + 1);
+      appCounts.set(
+        membership.teamId,
+        (appCounts.get(membership.teamId) ?? 0) + 1,
+      );
     }
   }
 
@@ -1806,7 +2256,7 @@ function buildUsersByTeamData(filteredUsers: DashboardUser[], maxRoles: number |
   const filteredTeams = teamFilterId
     ? teams.filter((entry) => entry.team.id === teamFilterId)
     : teams
-        .sort((a, b) => (b.human + b.app) - (a.human + a.app))
+        .sort((a, b) => b.human + b.app - (a.human + a.app))
         .slice(0, maxRoles ?? teams.length);
   return {
     labels: filteredTeams.map((entry) => entry.team.name),
@@ -1914,7 +2364,10 @@ function renderOrUpdateBarChart(
   return chart;
 }
 
-function setChartEmptyState(canvas: HTMLCanvasElement | null, isEmpty: boolean) {
+function setChartEmptyState(
+  canvas: HTMLCanvasElement | null,
+  isEmpty: boolean,
+) {
   if (!canvas) {
     return;
   }
@@ -1937,7 +2390,9 @@ function setModalEmptyState(isEmpty: boolean) {
   if (!elements.chartModalBody || !elements.chartModalCanvas) {
     return;
   }
-  let empty = elements.chartModalBody.querySelector(".chart-empty") as HTMLDivElement | null;
+  let empty = elements.chartModalBody.querySelector(
+    ".chart-empty",
+  ) as HTMLDivElement | null;
   if (!empty) {
     empty = document.createElement("div");
     empty.className = "chart-empty";
@@ -1966,14 +2421,28 @@ function updateDashboardCharts() {
     elements.chartUsersByRole,
     usersByRoleData.labels,
     [
-      { label: "Human users", data: usersByRoleData.human, backgroundColor: "#d35400" },
-      { label: "Application users", data: usersByRoleData.app, backgroundColor: "#f39c4a" },
+      {
+        label: "Human users",
+        data: usersByRoleData.human,
+        backgroundColor: "#d35400",
+      },
+      {
+        label: "Application users",
+        data: usersByRoleData.app,
+        backgroundColor: "#f39c4a",
+      },
     ],
     true,
   );
-  setChartEmptyState(elements.chartUsersByRole, usersByRoleData.labels.length === 0);
+  setChartEmptyState(
+    elements.chartUsersByRole,
+    usersByRoleData.labels.length === 0,
+  );
 
-  const teamsByRoleCounts = buildTeamsByRoleCounts(businessUnitId, teamFilterId);
+  const teamsByRoleCounts = buildTeamsByRoleCounts(
+    businessUnitId,
+    teamFilterId,
+  );
   const teamsByRoleData = buildRoleTotalChartData(
     teamsByRoleCounts,
     roleFilterId || null,
@@ -1985,10 +2454,17 @@ function updateDashboardCharts() {
     elements.chartTeamsByRole,
     teamsByRoleData.labels,
     [
-      { label: "Teams", data: teamsByRoleData.values, backgroundColor: "#1f7a8c" },
+      {
+        label: "Teams",
+        data: teamsByRoleData.values,
+        backgroundColor: "#1f7a8c",
+      },
     ],
   );
-  setChartEmptyState(elements.chartTeamsByRole, teamsByRoleData.labels.length === 0);
+  setChartEmptyState(
+    elements.chartTeamsByRole,
+    teamsByRoleData.labels.length === 0,
+  );
 
   const usersByBuData = buildUsersByBusinessUnitData(filteredUsers, maxRoles);
   state.dashboardCharts.usersByBusinessUnit = renderOrUpdateBarChart(
@@ -1996,12 +2472,23 @@ function updateDashboardCharts() {
     elements.chartUsersByBusinessUnit,
     usersByBuData.labels,
     [
-      { label: "Human users", data: usersByBuData.human, backgroundColor: "#d35400" },
-      { label: "Application users", data: usersByBuData.app, backgroundColor: "#f39c4a" },
+      {
+        label: "Human users",
+        data: usersByBuData.human,
+        backgroundColor: "#d35400",
+      },
+      {
+        label: "Application users",
+        data: usersByBuData.app,
+        backgroundColor: "#f39c4a",
+      },
     ],
     true,
   );
-  setChartEmptyState(elements.chartUsersByBusinessUnit, usersByBuData.labels.length === 0);
+  setChartEmptyState(
+    elements.chartUsersByBusinessUnit,
+    usersByBuData.labels.length === 0,
+  );
 
   const usersByTeamData = buildUsersByTeamData(filteredUsers, maxRoles);
   state.dashboardCharts.usersByTeam = renderOrUpdateBarChart(
@@ -2009,17 +2496,35 @@ function updateDashboardCharts() {
     elements.chartUsersByTeam,
     usersByTeamData.labels,
     [
-      { label: "Human users", data: usersByTeamData.human, backgroundColor: "#d35400" },
-      { label: "Application users", data: usersByTeamData.app, backgroundColor: "#f39c4a" },
+      {
+        label: "Human users",
+        data: usersByTeamData.human,
+        backgroundColor: "#d35400",
+      },
+      {
+        label: "Application users",
+        data: usersByTeamData.app,
+        backgroundColor: "#f39c4a",
+      },
     ],
     true,
   );
-  setChartEmptyState(elements.chartUsersByTeam, usersByTeamData.labels.length === 0);
+  setChartEmptyState(
+    elements.chartUsersByTeam,
+    usersByTeamData.labels.length === 0,
+  );
 }
 
-type DashboardChartKind = "usersByRole" | "teamsByRole" | "usersByBusinessUnit" | "usersByTeam";
+type DashboardChartKind =
+  | "usersByRole"
+  | "teamsByRole"
+  | "usersByBusinessUnit"
+  | "usersByTeam";
 
-function getDashboardChartData(kind: DashboardChartKind, maxRoles: number | null) {
+function getDashboardChartData(
+  kind: DashboardChartKind,
+  maxRoles: number | null,
+) {
   const roleFilterId = elements.dashboardRoleSelect?.value ?? "";
   const businessUnitId = elements.dashboardBusinessUnitSelect?.value ?? "";
   const teamFilterId = elements.dashboardTeamSelect?.value ?? "";
@@ -2039,13 +2544,24 @@ function getDashboardChartData(kind: DashboardChartKind, maxRoles: number | null
         labels: data.labels,
         stacked: true,
         datasets: [
-          { label: "Human users", data: data.human, backgroundColor: "#d35400" },
-          { label: "Application users", data: data.app, backgroundColor: "#f39c4a" },
+          {
+            label: "Human users",
+            data: data.human,
+            backgroundColor: "#d35400",
+          },
+          {
+            label: "Application users",
+            data: data.app,
+            backgroundColor: "#f39c4a",
+          },
         ],
       };
     }
     case "teamsByRole": {
-      const teamsByRoleCounts = buildTeamsByRoleCounts(businessUnitId, teamFilterId);
+      const teamsByRoleCounts = buildTeamsByRoleCounts(
+        businessUnitId,
+        teamFilterId,
+      );
       const data = buildRoleTotalChartData(
         teamsByRoleCounts,
         roleFilterId || null,
@@ -2056,7 +2572,9 @@ function getDashboardChartData(kind: DashboardChartKind, maxRoles: number | null
         title: "Teams per role",
         labels: data.labels,
         stacked: false,
-        datasets: [{ label: "Teams", data: data.values, backgroundColor: "#1f7a8c" }],
+        datasets: [
+          { label: "Teams", data: data.values, backgroundColor: "#1f7a8c" },
+        ],
       };
     }
     case "usersByBusinessUnit": {
@@ -2066,8 +2584,16 @@ function getDashboardChartData(kind: DashboardChartKind, maxRoles: number | null
         labels: data.labels,
         stacked: true,
         datasets: [
-          { label: "Human users", data: data.human, backgroundColor: "#d35400" },
-          { label: "Application users", data: data.app, backgroundColor: "#f39c4a" },
+          {
+            label: "Human users",
+            data: data.human,
+            backgroundColor: "#d35400",
+          },
+          {
+            label: "Application users",
+            data: data.app,
+            backgroundColor: "#f39c4a",
+          },
         ],
       };
     }
@@ -2078,8 +2604,16 @@ function getDashboardChartData(kind: DashboardChartKind, maxRoles: number | null
         labels: data.labels,
         stacked: true,
         datasets: [
-          { label: "Human users", data: data.human, backgroundColor: "#d35400" },
-          { label: "Application users", data: data.app, backgroundColor: "#f39c4a" },
+          {
+            label: "Human users",
+            data: data.human,
+            backgroundColor: "#d35400",
+          },
+          {
+            label: "Application users",
+            data: data.app,
+            backgroundColor: "#f39c4a",
+          },
         ],
       };
     }
@@ -2151,11 +2685,15 @@ function formatUserActiveLabel(user: DashboardUser): string {
 }
 
 function buildUserRoleExportRows(): string[][] {
-  const roleNameById = new Map(state.allRoles.map((role) => [role.id, role.name]));
+  const roleNameById = new Map(
+    state.allRoles.map((role) => [role.id, role.name]),
+  );
   const businessUnitById = new Map(
     state.dashboardBusinessUnits.map((unit) => [unit.id, unit.name]),
   );
-  const usersById = new Map(state.dashboardUsers.map((user) => [user.id, user]));
+  const usersById = new Map(
+    state.dashboardUsers.map((user) => [user.id, user]),
+  );
 
   const rows: string[][] = [
     ["User", "Email", "Status", "Business Unit", "Security Role"],
@@ -2182,7 +2720,9 @@ function buildUserRoleExportRows(): string[][] {
 
 function buildUserTeamExportRows(): string[][] {
   const teamNameById = new Map(state.teams.map((team) => [team.id, team.name]));
-  const usersById = new Map(state.dashboardUsers.map((user) => [user.id, user]));
+  const usersById = new Map(
+    state.dashboardUsers.map((user) => [user.id, user]),
+  );
   const rows: string[][] = [["User", "Email", "Status", "Team"]];
 
   for (const membership of state.dashboardTeamMemberships) {
@@ -2225,8 +2765,14 @@ async function exportDashboardData() {
     toolboxAPI.fileSystem,
     toolboxAPI.utils,
     [
-      { filename: `security-roles-users-${timestamp}.csv`, content: userRolesCsv },
-      { filename: `security-roles-teams-${timestamp}.csv`, content: userTeamsCsv },
+      {
+        filename: `security-roles-users-${timestamp}.csv`,
+        content: userRolesCsv,
+      },
+      {
+        filename: `security-roles-teams-${timestamp}.csv`,
+        content: userTeamsCsv,
+      },
     ],
     `security-roles-users-${timestamp}.csv`,
   );
@@ -2252,7 +2798,10 @@ async function loadSecurityCache(): Promise<boolean> {
     return false;
   }
 
-  const privilegeMeta = new Map<string, { access: AccessRight; entityLogicalName: string }>();
+  const privilegeMeta = new Map<
+    string,
+    { access: AccessRight; entityLogicalName: string }
+  >();
   const privilegeIdByKey = new Map<string, string>();
   const privilegeInfoById = new Map<string, PrivilegeInfo>();
 
@@ -2273,10 +2822,16 @@ async function loadSecurityCache(): Promise<boolean> {
       canBeGlobal: Boolean(privilege.canbeglobal),
     });
     privilegeMeta.set(privilege.privilegeid, parsed);
-    privilegeIdByKey.set(`${parsed.entityLogicalName}:${parsed.access}`, privilege.privilegeid);
+    privilegeIdByKey.set(
+      `${parsed.entityLogicalName}:${parsed.access}`,
+      privilege.privilegeid,
+    );
   }
 
-  const rolePrivilegesCache = new Map<string, Map<string, Record<AccessRight, PrivilegeLevel>>>();
+  const rolePrivilegesCache = new Map<
+    string,
+    Map<string, Record<AccessRight, PrivilegeLevel>>
+  >();
   const rolesToCache = state.allRoles.length > 0 ? state.allRoles : state.roles;
   let loadedRoles = 0;
   const batchSize = 5;
@@ -2300,11 +2855,16 @@ async function loadSecurityCache(): Promise<boolean> {
       rolePrivilegeCount += roleEntries.length;
       loadedRoles += 1;
       if (state.loading.active) {
-        updateLoadingProgress(loadedRoles, rolesToCache.length, UI_TEXT.loadingRolePrivileges);
+        updateLoadingProgress(
+          loadedRoles,
+          rolesToCache.length,
+          UI_TEXT.loadingRolePrivileges,
+        );
       }
 
       for (const entry of roleEntries) {
-        const privilegeId = entry.PrivilegeId ?? entry.privilegeid ?? entry._privilegeid_value;
+        const privilegeId =
+          entry.PrivilegeId ?? entry.privilegeid ?? entry._privilegeid_value;
         const depth = entry.Depth ?? entry.depth ?? 0;
         if (!privilegeId) {
           continue;
@@ -2314,7 +2874,10 @@ async function loadSecurityCache(): Promise<boolean> {
           continue;
         }
         const roleMap = rolePrivilegesCache.get(role.id)!;
-        const record = ensureRolePrivilegeRecord(roleMap, meta.entityLogicalName);
+        const record = ensureRolePrivilegeRecord(
+          roleMap,
+          meta.entityLogicalName,
+        );
         record[meta.access] = mapPrivilegeLevelFromDepth(depth);
       }
     }
@@ -2325,12 +2888,18 @@ async function loadSecurityCache(): Promise<boolean> {
   state.rolePrivileges = rolePrivilegesCache;
   state.cacheLoaded = true;
   logMessage(
-    formatCachedPrivileges(privileges.length, rolePrivilegeCount, rolesToCache.length),
+    formatCachedPrivileges(
+      privileges.length,
+      rolePrivilegeCount,
+      rolesToCache.length,
+    ),
   );
   return true;
 }
 
-async function ensureSecurityCacheLoaded(message = UI_TEXT.loadingRolePrivileges) {
+async function ensureSecurityCacheLoaded(
+  message = UI_TEXT.loadingRolePrivileges,
+) {
   if (state.cacheLoaded) {
     return true;
   }
@@ -2339,7 +2908,8 @@ async function ensureSecurityCacheLoaded(message = UI_TEXT.loadingRolePrivileges
   }
   state.cacheLoading = true;
   setLoading(true, message);
-  const totalRoles = state.allRoles.length > 0 ? state.allRoles.length : state.roles.length;
+  const totalRoles =
+    state.allRoles.length > 0 ? state.allRoles.length : state.roles.length;
   updateLoadingProgress(0, totalRoles, message);
   state.cachePromise = loadSecurityCache().finally(() => {
     state.cacheLoading = false;
@@ -2379,6 +2949,7 @@ async function loadRolePrivileges(roleId: string) {
       append: "none",
       appendto: "none",
       assign: "none",
+      share: "none",
     };
     return {
       entityLabel: entity.displayName,
@@ -2391,10 +2962,12 @@ async function loadRolePrivileges(roleId: string) {
       append: record.append,
       appendto: record.appendto,
       assign: record.assign,
+      share: record.share,
     };
   });
   renderPrivilegeTable();
-  const roleName = state.roles.find((role) => role.id === roleId)?.name ?? roleId;
+  const roleName =
+    state.roles.find((role) => role.id === roleId)?.name ?? roleId;
   setTableTitle(formatPrivilegesForRoleTitle(roleName));
 }
 
@@ -2404,10 +2977,16 @@ async function loadEntityCoverage(entityLogicalName: string) {
     return;
   }
   state.tableMode = "entity";
-  const entityLabel = state.entities.find((entity) => entity.logicalName === entityLogicalName)?.displayName;
-  const visibleRoles = state.roles.filter((role) => state.selectedRoleIds.has(role.id));
+  const entityLabel = state.entities.find(
+    (entity) => entity.logicalName === entityLogicalName,
+  )?.displayName;
+  const visibleRoles = state.roles.filter((role) =>
+    state.selectedRoleIds.has(role.id),
+  );
   state.privilegeRows = visibleRoles.map((role) => {
-    const record = state.rolePrivileges.get(role.id)?.get(entityLogicalName) ?? {
+    const record = state.rolePrivileges
+      .get(role.id)
+      ?.get(entityLogicalName) ?? {
       create: "none",
       read: "none",
       write: "none",
@@ -2415,6 +2994,7 @@ async function loadEntityCoverage(entityLogicalName: string) {
       append: "none",
       appendto: "none",
       assign: "none",
+      share: "none",
     };
     return {
       roleId: role.id,
@@ -2428,10 +3008,13 @@ async function loadEntityCoverage(entityLogicalName: string) {
       append: record.append,
       appendto: record.appendto,
       assign: record.assign,
+      share: record.share,
     };
   });
   renderPrivilegeTable();
-  setTableTitle(formatPrivilegesForTableTitle(entityLabel ?? entityLogicalName));
+  setTableTitle(
+    formatPrivilegesForTableTitle(entityLabel ?? entityLogicalName),
+  );
 }
 
 async function loadAssignmentView() {
@@ -2450,7 +3033,10 @@ async function loadAssignmentView() {
         activeUserIds,
       );
     }
-    renderAssignmentRoleOptionsWithCounts(UI_TEXT.unitUsers, state.assignmentRoleUserCounts);
+    renderAssignmentRoleOptionsWithCounts(
+      UI_TEXT.unitUsers,
+      state.assignmentRoleUserCounts,
+    );
     const roleId = elements.assignmentRoleSelect.value;
     if (!roleId) {
       setAssignmentStatus(UI_TEXT.assignmentSelectRoleUsers);
@@ -2465,7 +3051,8 @@ async function loadAssignmentView() {
       assigned: assigned.has(user.id),
     }));
     renderAssignmentTable(items);
-    const roleName = state.roles.find((role) => role.id === roleId)?.name ?? roleId;
+    const roleName =
+      state.roles.find((role) => role.id === roleId)?.name ?? roleId;
     const assignedCount = items.filter((item) => item.assigned).length;
     if (elements.assignmentTitle) {
       elements.assignmentTitle.textContent = formatAssignmentTitleUsersWithRole(
@@ -2482,7 +3069,10 @@ async function loadAssignmentView() {
     if (state.assignmentUserRoleCounts.size !== state.users.length) {
       state.assignmentUserRoleCounts = await loadUserAssignmentCounts();
     }
-    renderAssignmentUserOptionsWithCounts(UI_TEXT.unitRoles, state.assignmentUserRoleCounts);
+    renderAssignmentUserOptionsWithCounts(
+      UI_TEXT.unitRoles,
+      state.assignmentUserRoleCounts,
+    );
     const userId = elements.assignmentUserSelect.value;
     if (!userId) {
       setAssignmentStatus(UI_TEXT.assignmentSelectUserRoles);
@@ -2497,7 +3087,8 @@ async function loadAssignmentView() {
       assigned: assigned.has(role.id),
     }));
     renderAssignmentTable(items);
-    const userName = state.users.find((user) => user.id === userId)?.name ?? userId;
+    const userName =
+      state.users.find((user) => user.id === userId)?.name ?? userId;
     const assignedCount = items.filter((item) => item.assigned).length;
     if (elements.assignmentTitle) {
       elements.assignmentTitle.textContent = formatAssignmentTitleRolesForUser(
@@ -2517,7 +3108,10 @@ async function loadAssignmentView() {
         state.allRoles,
       );
     }
-    renderAssignmentRoleOptionsWithCounts(UI_TEXT.unitTeams, state.assignmentRoleTeamCounts);
+    renderAssignmentRoleOptionsWithCounts(
+      UI_TEXT.unitTeams,
+      state.assignmentRoleTeamCounts,
+    );
     const roleId = elements.assignmentRoleSelect.value;
     if (!roleId) {
       setAssignmentStatus(UI_TEXT.assignmentSelectRoleTeams);
@@ -2532,7 +3126,8 @@ async function loadAssignmentView() {
       assigned: assigned.has(team.id),
     }));
     renderAssignmentTable(items);
-    const roleName = state.roles.find((role) => role.id === roleId)?.name ?? roleId;
+    const roleName =
+      state.roles.find((role) => role.id === roleId)?.name ?? roleId;
     const assignedCount = items.filter((item) => item.assigned).length;
     if (elements.assignmentTitle) {
       elements.assignmentTitle.textContent = formatAssignmentTitleTeamsWithRole(
@@ -2549,7 +3144,10 @@ async function loadAssignmentView() {
     if (state.assignmentTeamRoleCounts.size !== state.teams.length) {
       state.assignmentTeamRoleCounts = await loadTeamAssignmentCounts();
     }
-    renderAssignmentTeamOptionsWithCounts(UI_TEXT.unitRoles, state.assignmentTeamRoleCounts);
+    renderAssignmentTeamOptionsWithCounts(
+      UI_TEXT.unitRoles,
+      state.assignmentTeamRoleCounts,
+    );
     const teamId = elements.assignmentTeamSelect.value;
     if (!teamId) {
       setAssignmentStatus(UI_TEXT.assignmentSelectTeamRoles);
@@ -2564,7 +3162,8 @@ async function loadAssignmentView() {
       assigned: assigned.has(role.id),
     }));
     renderAssignmentTable(items);
-    const teamName = state.teams.find((team) => team.id === teamId)?.name ?? teamId;
+    const teamName =
+      state.teams.find((team) => team.id === teamId)?.name ?? teamId;
     const assignedCount = items.filter((item) => item.assigned).length;
     if (elements.assignmentTitle) {
       elements.assignmentTitle.textContent = formatAssignmentTitleRolesForTeam(
@@ -2583,7 +3182,8 @@ async function applyAssignmentChange(action: "add" | "remove") {
     if (!roleRootId) {
       return;
     }
-    const roleName = state.roles.find((role) => role.id === roleRootId)?.name ?? roleRootId;
+    const roleName =
+      state.roles.find((role) => role.id === roleRootId)?.name ?? roleRootId;
     const processedUsers: string[] = [];
     const selectedUsers = Array.from(state.selectedAssignmentIds);
     for (const userId of selectedUsers) {
@@ -2603,7 +3203,9 @@ async function applyAssignmentChange(action: "add" | "remove") {
       processedUsers.push(user.name);
     }
     if (processedUsers.length > 0) {
-      logMessage(formatRoleAssignmentLogUsers(action, roleName, processedUsers));
+      logMessage(
+        formatRoleAssignmentLogUsers(action, roleName, processedUsers),
+      );
     }
   } else if (state.assignmentMode === "user") {
     const userId = elements.assignmentUserSelect.value;
@@ -2626,18 +3228,22 @@ async function applyAssignmentChange(action: "add" | "remove") {
       } else {
         await disassociateRoleFromUser(userId, roleId);
       }
-      const roleName = state.roles.find((role) => role.id === roleRootId)?.name ?? roleRootId;
+      const roleName =
+        state.roles.find((role) => role.id === roleRootId)?.name ?? roleRootId;
       processedRoles.push(roleName);
     }
     if (processedRoles.length > 0) {
-      logMessage(formatRoleAssignmentLogRolesForUser(action, user.name, processedRoles));
+      logMessage(
+        formatRoleAssignmentLogRolesForUser(action, user.name, processedRoles),
+      );
     }
   } else if (state.assignmentMode === "role-team") {
     const roleRootId = elements.assignmentRoleSelect.value;
     if (!roleRootId) {
       return;
     }
-    const roleName = state.roles.find((role) => role.id === roleRootId)?.name ?? roleRootId;
+    const roleName =
+      state.roles.find((role) => role.id === roleRootId)?.name ?? roleRootId;
     const processedTeams: string[] = [];
     const selectedTeams = Array.from(state.selectedAssignmentIds);
     for (const teamId of selectedTeams) {
@@ -2657,7 +3263,9 @@ async function applyAssignmentChange(action: "add" | "remove") {
       processedTeams.push(team.name);
     }
     if (processedTeams.length > 0) {
-      logMessage(formatRoleAssignmentLogTeams(action, roleName, processedTeams));
+      logMessage(
+        formatRoleAssignmentLogTeams(action, roleName, processedTeams),
+      );
     }
   } else {
     const teamId = elements.assignmentTeamSelect.value;
@@ -2680,11 +3288,14 @@ async function applyAssignmentChange(action: "add" | "remove") {
       } else {
         await disassociateRoleFromTeam(teamId, roleId);
       }
-      const roleName = state.roles.find((role) => role.id === roleRootId)?.name ?? roleRootId;
+      const roleName =
+        state.roles.find((role) => role.id === roleRootId)?.name ?? roleRootId;
       processedRoles.push(roleName);
     }
     if (processedRoles.length > 0) {
-      logMessage(formatRoleAssignmentLogRolesForTeam(action, team.name, processedRoles));
+      logMessage(
+        formatRoleAssignmentLogRolesForTeam(action, team.name, processedRoles),
+      );
     }
   }
   resetAssignmentCaches();
@@ -2714,17 +3325,25 @@ async function applyChanges() {
   >();
 
   for (const change of state.pendingChanges) {
-    const privilegeId = state.privilegeIdByKey.get(`${change.entityLogicalName}:${change.privilege}`);
+    const privilegeId = state.privilegeIdByKey.get(
+      `${change.entityLogicalName}:${change.privilege}`,
+    );
     if (!privilegeId) {
-      logMessage(formatMissingPrivilegeId(change.entityLogicalName, change.privilege));
+      logMessage(
+        formatMissingPrivilegeId(change.entityLogicalName, change.privilege),
+      );
       continue;
     }
     const roleMap = state.rolePrivileges.get(change.roleId) ?? new Map();
     const record = roleMap.get(change.entityLogicalName) ?? {
+      create: "none",
       read: "none",
       write: "none",
+      delete: "none",
       append: "none",
       appendto: "none",
+      assign: "none",
+      share: "none",
     };
     const currentLevel = record[change.privilege];
     if (currentLevel === change.level) {
@@ -2764,14 +3383,22 @@ async function applyChanges() {
       for (const privilegeId of privilegeIds) {
         await removePrivilegesFromRole(roleId, privilegeId);
         completedCalls += 1;
-        updateLoadingProgress(completedCalls, totalCalls, UI_TEXT.loadingApplyingChanges);
+        updateLoadingProgress(
+          completedCalls,
+          totalCalls,
+          UI_TEXT.loadingApplyingChanges,
+        );
       }
     }
 
     for (const [roleId, privileges] of addsByRole) {
       await addPrivilegesToRole(roleId, privileges);
       completedCalls += 1;
-      updateLoadingProgress(completedCalls, totalCalls, UI_TEXT.loadingApplyingChanges);
+      updateLoadingProgress(
+        completedCalls,
+        totalCalls,
+        UI_TEXT.loadingApplyingChanges,
+      );
     }
 
     for (const change of state.pendingChanges) {
@@ -2779,7 +3406,10 @@ async function applyChanges() {
         state.rolePrivileges.set(change.roleId, new Map());
       }
       const roleMap = state.rolePrivileges.get(change.roleId)!;
-      const record = ensureRolePrivilegeRecord(roleMap, change.entityLogicalName);
+      const record = ensureRolePrivilegeRecord(
+        roleMap,
+        change.entityLogicalName,
+      );
       record[change.privilege] = change.level;
     }
   } catch (error) {
@@ -2844,7 +3474,9 @@ async function initialize() {
 
     const connection = await getActiveConnection();
     updateConnectionBadge(
-      connection ? `${connection.name} (${connection.environment})` : UI_TEXT.connectionNotConnected,
+      connection
+        ? `${connection.name} (${connection.environment})`
+        : UI_TEXT.connectionNotConnected,
     );
 
     await applyTheme();
@@ -2911,7 +3543,10 @@ function wireEvents() {
       return;
     }
     const target = event.target as Node;
-    if (elements.roleFilterMenu.contains(target) || elements.roleFilterButton.contains(target)) {
+    if (
+      elements.roleFilterMenu.contains(target) ||
+      elements.roleFilterButton.contains(target)
+    ) {
       return;
     }
     elements.roleFilterMenu.classList.add("hidden");
@@ -3020,7 +3655,9 @@ function wireEvents() {
   for (const button of elements.dashboardChartButtons) {
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      const kind = button.dataset.dashboardChart as DashboardChartKind | undefined;
+      const kind = button.dataset.dashboardChart as
+        | DashboardChartKind
+        | undefined;
       if (kind) {
         openDashboardChartModal(kind);
       }
@@ -3033,7 +3670,9 @@ function wireEvents() {
       if (target && target.closest(".chart-expand")) {
         return;
       }
-      const kind = card.dataset.dashboardChart as DashboardChartKind | undefined;
+      const kind = card.dataset.dashboardChart as
+        | DashboardChartKind
+        | undefined;
       if (kind) {
         openDashboardChartModal(kind);
       }
@@ -3051,7 +3690,11 @@ function wireEvents() {
     });
   }
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && elements.chartModal && !elements.chartModal.classList.contains("hidden")) {
+    if (
+      event.key === "Escape" &&
+      elements.chartModal &&
+      !elements.chartModal.classList.contains("hidden")
+    ) {
       closeDashboardChartModal();
     }
   });
@@ -3061,7 +3704,10 @@ function wireEvents() {
     loadAssignmentView();
   });
   elements.assignmentRoleSelect.addEventListener("change", () => {
-    if (state.assignmentMode === "role" || state.assignmentMode === "role-team") {
+    if (
+      state.assignmentMode === "role" ||
+      state.assignmentMode === "role-team"
+    ) {
       loadAssignmentView();
     }
   });
@@ -3075,10 +3721,16 @@ function wireEvents() {
       loadAssignmentView();
     }
   });
-  elements.assignmentAdd.addEventListener("click", () => applyAssignmentChange("add"));
-  elements.assignmentRemove.addEventListener("click", () => applyAssignmentChange("remove"));
+  elements.assignmentAdd.addEventListener("click", () =>
+    applyAssignmentChange("add"),
+  );
+  elements.assignmentRemove.addEventListener("click", () =>
+    applyAssignmentChange("remove"),
+  );
   elements.assignmentSelectAll.addEventListener("click", () => {
-    state.selectedAssignmentIds = new Set(state.assignmentItems.map((item) => item.id));
+    state.selectedAssignmentIds = new Set(
+      state.assignmentItems.map((item) => item.id),
+    );
     renderAssignmentTable(state.assignmentItems);
     updateAssignmentSelectionUi();
   });
@@ -3090,7 +3742,8 @@ function wireEvents() {
 
   for (const button of elements.assignmentSortButtons) {
     button.addEventListener("click", () => {
-      const column = (button.dataset.assignSort as AssignmentSortColumn) || "label";
+      const column =
+        (button.dataset.assignSort as AssignmentSortColumn) || "label";
       if (state.assignmentSort.column === column) {
         state.assignmentSort.direction =
           state.assignmentSort.direction === "asc" ? "desc" : "asc";
@@ -3106,7 +3759,10 @@ function wireEvents() {
   if (elements.assignmentFilterAssigned) {
     elements.assignmentFilterAssigned.addEventListener("change", () => {
       state.assignmentFilter =
-        (elements.assignmentFilterAssigned.value as "" | "assigned" | "not-assigned") || "";
+        (elements.assignmentFilterAssigned.value as
+          | ""
+          | "assigned"
+          | "not-assigned") || "";
       renderAssignmentTable(state.assignmentItems);
     });
   }
@@ -3114,6 +3770,22 @@ function wireEvents() {
     elements.assignmentSearch.addEventListener("input", () => {
       state.assignmentSearch = elements.assignmentSearch.value.trim();
       renderAssignmentTable(state.assignmentItems);
+    });
+  }
+
+  if (elements.privilegeSearch) {
+    elements.privilegeSearch.addEventListener("input", async () => {
+      state.privilegeSearch = elements.privilegeSearch.value
+        .trim()
+        .toLowerCase();
+      if (!state.cacheLoaded) {
+        const loaded = await ensureSecurityCacheLoaded();
+        if (loaded) {
+          await refreshPrivilegeView();
+        }
+        return;
+      }
+      renderPrivilegeTable();
     });
   }
 
@@ -3128,6 +3800,23 @@ function wireEvents() {
       }
       updateSortIndicators();
       renderPrivilegeTable();
+    });
+  }
+
+  for (const button of elements.bulkApplyButtons) {
+    button.addEventListener("click", () => {
+      const privilege = button.dataset.bulkApply as AccessRight | undefined;
+      if (!privilege) {
+        return;
+      }
+      const select = elements.bulkSelects.find(
+        (item) => item.dataset.bulkSelect === privilege,
+      );
+      if (!select || !select.value) {
+        logMessage(UI_TEXT.bulkUpdateNoSelection);
+        return;
+      }
+      applyBulkUpdate(privilege, select.value as PrivilegeLevel);
     });
   }
 

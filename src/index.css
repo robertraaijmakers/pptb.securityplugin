@@ -527,11 +527,10 @@ body.theme-dark .btn:not(:disabled):hover {
   padding: 16px 20px 20px;
 }
 
-.assignment-toolbar {
+.assignment-filter-actions {
   display: flex;
-  justify-content: flex-end;
   gap: 12px;
-  margin-bottom: 12px;
+  align-items: center;
 }
 
 .assignment-table {
@@ -894,6 +893,80 @@ body.theme-dark .chart-empty {
   padding: 6px 12px 12px;
 }
 
+.bulk-row th {
+  padding: 8px 12px 12px;
+  border-top: 1px solid var(--border);
+  background: #fbf8f3;
+}
+
+body.theme-dark .bulk-row th {
+  background: #221e1a;
+}
+
+.bulk-label {
+  display: inline-block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+
+.bulk-control {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.bulk-select {
+  width: 100%;
+  min-width: 120px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--ink);
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.bulk-apply {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.bulk-apply:not(:disabled):hover {
+  background: #f6efe6;
+  border-color: #d4c5b6;
+}
+
+.bulk-apply:disabled,
+.bulk-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+body.theme-dark .bulk-select,
+body.theme-dark .bulk-apply {
+  background: #1f1b17;
+  color: var(--ink);
+  border-color: var(--border);
+}
+
+body.theme-dark .bulk-apply:not(:disabled):hover {
+  background: #2a241f;
+  border-color: #3f362f;
+}
+
 .filter-select {
   width: 100%;
   padding: 6px 8px;
@@ -921,6 +994,7 @@ body.theme-dark .chart-empty {
 
 .table.hide-ownership thead tr:first-child th:nth-child(2),
 .table.hide-ownership thead tr.filter-row th:nth-child(2),
+.table.hide-ownership thead tr.bulk-row th:nth-child(2),
 .table.hide-ownership tbody td:nth-child(2) {
   display: none;
 }
