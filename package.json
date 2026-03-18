@@ -1,6 +1,6 @@
 {
   "name": "@robertraaijmakers/pptb-securityplugin",
-  "version": "0.1.6",
+  "version": "1.0.0",
   "displayName": "Security Roles Explorer",
   "description": "Be fully in control of your security by quickly viewing and managing which security roles give access to which tables. And who is assigned which security role.",
   "icon": "icon.svg",
@@ -30,7 +30,8 @@
     "readmeUrl": "https://raw.githubusercontent.com/robertraaijmakers/pptb.securityplugin/main/README.md"
   },
   "features": {
-    "minAPI": "1.3.0"
+    "minAPI": "1.3.0",
+    "multiConnection": "none"
   },
   "files": [
     "dist/**",
@@ -44,16 +45,16 @@
     "build:finalize": "npm run build && npm run finalize-package",
     "build:watch": "esbuild src/app.ts --bundle --sourcemap --outdir=dist --watch",
     "finalize-package": "node scripts/finalize-package.js",
-    "validate:publish": "node scripts/validate-publish.js",
     "prepare:beta": "npm run version:beta && npm run build && npm run finalize-package",
     "prepare:stable": "npm run version:stable && npm run build && npm run finalize-package",
+    "validate": "pptb-validate",
     "version:beta": "npm version prerelease --preid beta",
     "version:stable": "npm version patch",
     "publish:beta": "npm publish --access public --tag beta",
     "publish:stable": "npm publish --access public"
   },
   "devDependencies": {
-    "@pptb/types": "1.0.20",
+    "@pptb/types": "1.2.0",
     "esbuild": "0.27.3",
     "typescript": "^5.4.5"
   },
