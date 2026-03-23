@@ -320,6 +320,14 @@ body.theme-dark .toggle-track {
   position: relative;
 }
 
+.searchable-select {
+  position: relative;
+}
+
+.searchable-select-native {
+  display: none;
+}
+
 .multi-select-button {
   width: 100%;
   padding: 10px 12px;
@@ -347,9 +355,31 @@ body.theme-dark .toggle-track {
   display: none;
 }
 
+.searchable-select-menu {
+  z-index: 5;
+}
+
+.search-input {
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--ink);
+}
+
+body.theme-dark .search-input {
+  background: #24201c;
+  color: var(--ink);
+  border-color: var(--border);
+}
+
 .multi-select-actions {
   display: flex;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
@@ -377,6 +407,37 @@ body.theme-dark .toggle-track {
   align-items: center;
   gap: 8px;
   font-size: 13px;
+}
+
+.searchable-select-item {
+  display: flex;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.searchable-select-item:hover {
+  border-color: var(--border);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.searchable-select-item.selected {
+  border-color: var(--accent);
+}
+
+body.theme-dark .searchable-select-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.searchable-select-empty {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 8px 10px;
 }
 
 .checkbox-control {

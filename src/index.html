@@ -81,9 +81,16 @@
               </button>
               <div class="multi-select-menu hidden" id="role-filter-menu">
                 <div class="multi-select-actions">
-                  <button type="button" class="link-button" id="role-filter-all">Select all</button>
-                  <button type="button" class="link-button" id="role-filter-none">Clear</button>
+                  <button type="button" class="link-button" id="role-filter-bulk">Select filtered</button>
+                  <button type="button" class="link-button" id="role-filter-clear">Clear filtered</button>
+                  <button type="button" class="link-button" id="role-filter-clear-all">Clear all</button>
                 </div>
+                <input
+                  id="role-filter-search"
+                  class="search-input"
+                  type="text"
+                  placeholder="Search roles"
+                />
                 <div class="multi-select-list" id="role-filter-list"></div>
               </div>
             </div>

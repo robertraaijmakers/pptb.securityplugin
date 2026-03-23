@@ -73,12 +73,13 @@ export async function loadRoleRootMap(): Promise<Map<string, string>> {
 
 export async function loadUsers(): Promise<UserSummary[]> {
   const response = await dataverseAPI.queryData(
-    "systemusers?$select=systemuserid,fullname,domainname,_businessunitid_value,isdisabled,accessmode&$filter=isdisabled eq false and accessmode ne 3 and accessmode ne 5",
+    "systemusers?$select=systemuserid,fullname,domainname,internalemailaddress,_businessunitid_value,isdisabled,accessmode&$filter=isdisabled eq false and accessmode ne 3 and accessmode ne 5",
   );
   return (response.value ?? []).map((user: any) => ({
     id: user.systemuserid,
     name: user.fullname ?? user.domainname ?? "Unknown",
     domainName: user.domainname ?? "",
+    email: user.internalemailaddress ?? "",
     businessUnitId: user._businessunitid_value ?? "",
   }));
 }

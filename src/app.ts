@@ -101,6 +101,7 @@ const state = {
   >(),
   tableMode: "role" as FilterMode,
   selectedRoleIds: new Set<string>(),
+  roleFilterSearch: "",
   hideManagedRoles: false,
   currentTab: "privileges" as "privileges" | "assignments" | "dashboard",
   rightsFilter: "all" as "all" | "with" | "without",
@@ -200,11 +201,17 @@ const elements = {
   ) as HTMLButtonElement,
   roleFilterMenu: document.getElementById("role-filter-menu") as HTMLDivElement,
   roleFilterList: document.getElementById("role-filter-list") as HTMLDivElement,
-  roleFilterAll: document.getElementById(
-    "role-filter-all",
+  roleFilterSearch: document.getElementById(
+    "role-filter-search",
+  ) as HTMLInputElement,
+  roleFilterClear: document.getElementById(
+    "role-filter-clear",
   ) as HTMLButtonElement,
-  roleFilterNone: document.getElementById(
-    "role-filter-none",
+  roleFilterBulk: document.getElementById(
+    "role-filter-bulk",
+  ) as HTMLButtonElement,
+  roleFilterClearAll: document.getElementById(
+    "role-filter-clear-all",
   ) as HTMLButtonElement,
   rolesCustomOnlyGlobal: document.getElementById(
     "roles-custom-only-global",
@@ -392,6 +399,223 @@ const elements = {
     document.querySelectorAll(".filter-select"),
   ) as HTMLSelectElement[],
 };
+
+type SearchableSelectInstance = {
+  select: HTMLSelectElement;
+  wrapper: HTMLDivElement;
+  button: HTMLButtonElement;
+  menu: HTMLDivElement;
+  searchInput: HTMLInputElement;
+  list: HTMLDivElement;
+  placeholder: string;
+};
+
+const searchableSelectInstances = new Map<string, SearchableSelectInstance>();
+const searchableSelectIds = [
+  "role-select",
+  "entity-select",
+  "assignment-role-select",
+  "assignment-user-select",
+  "assignment-team-select",
+  "dashboard-bu-select",
+  "dashboard-role-select",
+  "dashboard-team-select",
+];
+
+function normalizeSearchValue(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function setOptionSearchText(option: HTMLOptionElement, searchText?: string) {
+  if (!searchText) {
+    delete option.dataset.searchText;
+    return;
+  }
+  option.dataset.searchText = searchText;
+}
+
+function closeAllSearchableSelectMenus(exceptId?: string) {
+  for (const [id, instance] of searchableSelectInstances.entries()) {
+    if (exceptId && id === exceptId) {
+      continue;
+    }
+    instance.menu.classList.add("hidden");
+    instance.button.setAttribute("aria-expanded", "false");
+  }
+}
+
+function updateSearchableSelectButton(select: HTMLSelectElement) {
+  if (!select.id) {
+    return;
+  }
+  const instance = searchableSelectInstances.get(select.id);
+  if (!instance) {
+    return;
+  }
+  const selectedOption =
+    select.selectedOptions.length > 0 ? select.selectedOptions[0] : null;
+  instance.button.textContent = selectedOption?.textContent || instance.placeholder;
+  instance.button.disabled = select.disabled || select.options.length === 0;
+}
+
+function renderSearchableSelectList(select: HTMLSelectElement) {
+  if (!select.id) {
+    return;
+  }
+  const instance = searchableSelectInstances.get(select.id);
+  if (!instance) {
+    return;
+  }
+
+  const filterTerm = normalizeSearchValue(instance.searchInput.value);
+  const options = Array.from(select.options);
+  const matchingOptions = options.filter((option) => {
+    const label = normalizeSearchValue(option.textContent ?? "");
+    const value = normalizeSearchValue(option.value);
+    const metadata = normalizeSearchValue(option.dataset.searchText ?? "");
+    if (!filterTerm) {
+      return true;
+    }
+    return (
+      label.includes(filterTerm) ||
+      value.includes(filterTerm) ||
+      metadata.includes(filterTerm)
+    );
+  });
+
+  instance.list.innerHTML = "";
+  if (matchingOptions.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "searchable-select-empty";
+    empty.textContent = UI_TEXT.noItems;
+    instance.list.appendChild(empty);
+    return;
+  }
+
+  for (const option of matchingOptions) {
+    const itemButton = document.createElement("button");
+    itemButton.type = "button";
+    itemButton.className = "searchable-select-item";
+    itemButton.textContent = option.textContent ?? "";
+    itemButton.disabled = option.disabled;
+    if (option.value === select.value) {
+      itemButton.classList.add("selected");
+    }
+    itemButton.addEventListener("click", () => {
+      if (option.disabled) {
+        return;
+      }
+      select.value = option.value;
+      select.dispatchEvent(new Event("change"));
+      updateSearchableSelectButton(select);
+      instance.menu.classList.add("hidden");
+      instance.button.setAttribute("aria-expanded", "false");
+      instance.searchInput.value = "";
+      renderSearchableSelectList(select);
+    });
+    instance.list.appendChild(itemButton);
+  }
+}
+
+function refreshSearchableSelect(select: HTMLSelectElement) {
+  if (!select.id) {
+    return;
+  }
+  const instance = searchableSelectInstances.get(select.id);
+  if (!instance) {
+    return;
+  }
+  updateSearchableSelectButton(select);
+  renderSearchableSelectList(select);
+}
+
+function initSearchableSelect(select: HTMLSelectElement, placeholder: string) {
+  if (!select.id || searchableSelectInstances.has(select.id)) {
+    return;
+  }
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "searchable-select";
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "multi-select-button searchable-select-button";
+  button.setAttribute("aria-expanded", "false");
+
+  const menu = document.createElement("div");
+  menu.className = "multi-select-menu searchable-select-menu hidden";
+
+  const searchInput = document.createElement("input");
+  searchInput.type = "text";
+  searchInput.className = "search-input";
+  searchInput.placeholder = UI_TEXT.search;
+
+  const list = document.createElement("div");
+  list.className = "multi-select-list searchable-select-list";
+
+  menu.appendChild(searchInput);
+  menu.appendChild(list);
+  wrapper.appendChild(button);
+  wrapper.appendChild(menu);
+
+  select.classList.add("searchable-select-native");
+  select.insertAdjacentElement("afterend", wrapper);
+
+  searchableSelectInstances.set(select.id, {
+    select,
+    wrapper,
+    button,
+    menu,
+    searchInput,
+    list,
+    placeholder,
+  });
+
+  button.addEventListener("click", () => {
+    if (button.disabled) {
+      return;
+    }
+    const isHidden = menu.classList.contains("hidden");
+    closeAllSearchableSelectMenus(select.id);
+    menu.classList.toggle("hidden", !isHidden);
+    button.setAttribute("aria-expanded", isHidden ? "true" : "false");
+    if (isHidden) {
+      renderSearchableSelectList(select);
+      searchInput.focus();
+      searchInput.select();
+    }
+  });
+
+  searchInput.addEventListener("input", () => {
+    renderSearchableSelectList(select);
+  });
+
+  select.addEventListener("change", () => {
+    updateSearchableSelectButton(select);
+    renderSearchableSelectList(select);
+  });
+
+  document.addEventListener("click", (event) => {
+    const target = event.target as Node;
+    if (!wrapper.contains(target)) {
+      menu.classList.add("hidden");
+      button.setAttribute("aria-expanded", "false");
+    }
+  });
+
+  refreshSearchableSelect(select);
+}
+
+function initSearchableSelects() {
+  for (const id of searchableSelectIds) {
+    const select = document.getElementById(id) as HTMLSelectElement | null;
+    if (!select) {
+      continue;
+    }
+    const placeholder = select.options[0]?.textContent?.trim() || UI_TEXT.select;
+    initSearchableSelect(select, placeholder);
+  }
+}
 
 initLogger(elements.log);
 
@@ -620,18 +844,21 @@ function applyRoleFilterToUi() {
     state.roles,
     (item) => item.id,
     (item) => item.name,
+    (item) => `${item.name} ${item.id}`,
   );
   renderSelectOptionsWithSelection(
     elements.assignmentRoleSelect,
     state.roles,
     (item) => item.id,
     (item) => item.name,
+    (item) => `${item.name} ${item.id}`,
   );
   renderSelectOptionsWithAll(
     elements.dashboardRoleSelect,
     state.roles,
     (item) => item.id,
     (item) => item.name,
+    (item) => `${item.name} ${item.id}`,
   );
 
   if (
@@ -640,6 +867,7 @@ function applyRoleFilterToUi() {
     !elements.roleSelect.value
   ) {
     elements.roleSelect.value = state.roles[0].id;
+    refreshSearchableSelect(elements.roleSelect);
   }
   if (state.cacheLoaded) {
     if (state.filterMode === "entity" && state.entities.length > 0) {
@@ -712,14 +940,20 @@ function renderSelectOptions<
   items: T[],
   getValue: (item: T) => string,
   getLabel: (item: T) => string,
+  getSearchText?: (item: T) => string,
 ) {
   select.innerHTML = "";
-  for (const item of items) {
+  const sortedItems = [...items].sort((a, b) =>
+    getLabel(a).localeCompare(getLabel(b), undefined, { sensitivity: "base" }),
+  );
+  for (const item of sortedItems) {
     const option = document.createElement("option");
     option.value = getValue(item);
     option.textContent = getLabel(item);
+    setOptionSearchText(option, getSearchText?.(item));
     select.appendChild(option);
   }
+  refreshSearchableSelect(select);
 }
 
 function renderSelectOptionsWithSelection<
@@ -734,12 +968,14 @@ function renderSelectOptionsWithSelection<
   items: T[],
   getValue: (item: T) => string,
   getLabel: (item: T) => string,
+  getSearchText?: (item: T) => string,
 ) {
   const previousValue = select.value;
-  renderSelectOptions(select, items, getValue, getLabel);
+  renderSelectOptions(select, items, getValue, getLabel, getSearchText);
   if (previousValue && items.some((item) => getValue(item) === previousValue)) {
     select.value = previousValue;
   }
+  refreshSearchableSelect(select);
 }
 
 function renderSelectOptionsWithAll<
@@ -754,6 +990,7 @@ function renderSelectOptionsWithAll<
   items: T[],
   getValue: (item: T) => string,
   getLabel: (item: T) => string,
+  getSearchText?: (item: T) => string,
 ) {
   const previousValue = select.value;
   select.innerHTML = "";
@@ -761,15 +998,20 @@ function renderSelectOptionsWithAll<
   optionAll.value = "";
   optionAll.textContent = UI_TEXT.labelAll;
   select.appendChild(optionAll);
-  for (const item of items) {
+  const sortedItems = [...items].sort((a, b) =>
+    getLabel(a).localeCompare(getLabel(b), undefined, { sensitivity: "base" }),
+  );
+  for (const item of sortedItems) {
     const option = document.createElement("option");
     option.value = getValue(item);
     option.textContent = getLabel(item);
+    setOptionSearchText(option, getSearchText?.(item));
     select.appendChild(option);
   }
   if (previousValue && items.some((item) => getValue(item) === previousValue)) {
     select.value = previousValue;
   }
+  refreshSearchableSelect(select);
 }
 
 function setTab(tab: "privileges" | "assignments" | "dashboard") {
@@ -980,10 +1222,8 @@ function renderRoleFilterOptions() {
     return;
   }
   elements.roleFilterList.innerHTML = "";
-  const sortedRoles = [...state.roles].sort((a, b) =>
-    a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
-  );
-  for (const role of sortedRoles) {
+  const filteredRoles = getFilteredRolesForRoleFilter();
+  for (const role of filteredRoles) {
     const item = document.createElement("label");
     item.className = "multi-select-item";
     const checkbox = document.createElement("input");
@@ -1006,7 +1246,38 @@ function renderRoleFilterOptions() {
     item.appendChild(text);
     elements.roleFilterList.appendChild(item);
   }
+
+  if (filteredRoles.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "searchable-select-empty";
+    empty.textContent = UI_TEXT.noItems;
+    elements.roleFilterList.appendChild(empty);
+  }
+
   updateRoleFilterLabel();
+}
+
+function getFilteredRolesForRoleFilter(): RoleSummary[] {
+  const filterTerm = state.roleFilterSearch.trim().toLowerCase();
+  const sortedRoles = [...state.roles].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+  );
+  return sortedRoles.filter((role) => {
+    if (!filterTerm) {
+      return true;
+    }
+    return (
+      role.name.toLowerCase().includes(filterTerm) ||
+      role.id.toLowerCase().includes(filterTerm)
+    );
+  });
+}
+
+function refreshRoleFilterResults() {
+  renderRoleFilterOptions();
+  if (state.tableMode === "entity") {
+    loadEntityCoverage(elements.entitySelect.value);
+  }
 }
 
 function setRoleFilterVisibility(show: boolean) {
@@ -1541,6 +1812,7 @@ async function loadEntities() {
     state.entities,
     (item) => item.logicalName,
     (item) => item.displayName,
+    (item) => `${item.displayName} ${item.logicalName}`,
   );
 }
 
@@ -1551,6 +1823,7 @@ async function loadUsers() {
     state.users,
     (item) => item.id,
     (item) => item.name,
+    (item) => `${item.name} ${item.domainName} ${item.email ?? ""}`,
   );
   state.usersLoaded = true;
 }
@@ -1562,6 +1835,7 @@ async function loadTeams() {
     state.teams,
     (item) => item.id,
     (item) => item.name,
+    (item) => `${item.name} ${item.id}`,
   );
   state.teamsLoaded = true;
 }
@@ -1829,6 +2103,7 @@ function renderAssignmentRoleOptionsWithCounts(
         counts.get(item.id) ?? 0,
         unitLabel,
       ),
+    (item) => `${item.name} ${item.id}`,
   );
 }
 
@@ -1846,6 +2121,7 @@ function renderAssignmentUserOptionsWithCounts(
         counts.get(item.id) ?? 0,
         unitLabel,
       ),
+    (item) => `${item.name} ${item.domainName} ${item.email ?? ""}`,
   );
 }
 
@@ -1863,6 +2139,7 @@ function renderAssignmentTeamOptionsWithCounts(
         counts.get(item.id) ?? 0,
         unitLabel,
       ),
+    (item) => `${item.name} ${item.id}`,
   );
 }
 
@@ -1974,18 +2251,21 @@ async function ensureDashboardDataLoaded() {
         state.dashboardBusinessUnits,
         (item) => item.id,
         (item) => item.name,
+        (item) => `${item.name} ${item.id}`,
       );
       renderSelectOptionsWithAll(
         elements.dashboardRoleSelect,
         state.roles,
         (item) => item.id,
         (item) => item.name,
+        (item) => `${item.name} ${item.id}`,
       );
       renderSelectOptionsWithAll(
         elements.dashboardTeamSelect,
         state.teams,
         (item) => item.id,
         (item) => item.name,
+        (item) => `${item.name} ${item.id}`,
       );
       state.dashboardLoaded = true;
     } catch (error) {
@@ -3452,9 +3732,11 @@ async function refreshData() {
 
     if (state.filterMode === "role" && state.roles.length > 0) {
       elements.roleSelect.value = state.roles[0].id;
+      refreshSearchableSelect(elements.roleSelect);
     }
     if (state.filterMode === "entity" && state.entities.length > 0) {
       elements.entitySelect.value = state.entities[0].logicalName;
+      refreshSearchableSelect(elements.entitySelect);
     }
     if (state.currentTab === "dashboard") {
       await renderDashboard();
@@ -3523,20 +3805,33 @@ function wireEvents() {
   });
   elements.roleFilterButton.addEventListener("click", () => {
     elements.roleFilterMenu.classList.toggle("hidden");
-  });
-  elements.roleFilterAll.addEventListener("click", () => {
-    state.selectedRoleIds = new Set(state.roles.map((role) => role.id));
-    renderRoleFilterOptions();
-    if (state.tableMode === "entity") {
-      loadEntityCoverage(elements.entitySelect.value);
+    if (!elements.roleFilterMenu.classList.contains("hidden")) {
+      elements.roleFilterSearch.focus();
+      elements.roleFilterSearch.select();
     }
   });
-  elements.roleFilterNone.addEventListener("click", () => {
+  elements.roleFilterSearch.addEventListener("input", () => {
+    state.roleFilterSearch = elements.roleFilterSearch.value;
+    renderRoleFilterOptions();
+  });
+  elements.roleFilterClear.addEventListener("click", () => {
+    const filteredIds = new Set(
+      getFilteredRolesForRoleFilter().map((role) => role.id),
+    );
+    for (const roleId of filteredIds) {
+      state.selectedRoleIds.delete(roleId);
+    }
+    refreshRoleFilterResults();
+  });
+  elements.roleFilterBulk.addEventListener("click", () => {
+    for (const role of getFilteredRolesForRoleFilter()) {
+      state.selectedRoleIds.add(role.id);
+    }
+    refreshRoleFilterResults();
+  });
+  elements.roleFilterClearAll.addEventListener("click", () => {
     state.selectedRoleIds.clear();
-    renderRoleFilterOptions();
-    if (state.tableMode === "entity") {
-      loadEntityCoverage(elements.entitySelect.value);
-    }
+    refreshRoleFilterResults();
   });
   document.addEventListener("click", (event) => {
     if (!elements.roleFilterMenu || !elements.roleFilterButton) {
@@ -3838,6 +4133,7 @@ function wireEvents() {
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => {
+    initSearchableSelects();
     renderFilterOptions();
     updateSortIndicators();
     updateAssignmentSortIndicators();
@@ -3849,6 +4145,7 @@ if (document.readyState === "loading") {
     initialize();
   });
 } else {
+  initSearchableSelects();
   renderFilterOptions();
   updateSortIndicators();
   updateAssignmentSortIndicators();
