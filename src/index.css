@@ -617,6 +617,32 @@ body.theme-dark .btn:not(:disabled):hover {
   color: var(--ink);
 }
 
+.assignment-status-pill.pending-change {
+  background: #ffe6c7;
+  border: 1px solid #e1a56b;
+}
+
+.assignment-row-pending {
+  background: #fff8ee;
+}
+
+body.theme-dark .assignment-row-pending {
+  background: #2f241b;
+}
+
+body.theme-dark .assignment-status-pill.pending-change {
+  background: #3a2a1e;
+  border-color: #b97638;
+}
+
+.assignment-pending-indicator {
+  margin-top: 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--accent-dark);
+}
+
 .table-loading {
   position: absolute;
   inset: 76px 0 0 0;
@@ -871,10 +897,32 @@ body.theme-dark .chart-empty {
   border-bottom: 1px solid var(--border);
 }
 
+.table thead th.sortable-header {
+  cursor: pointer;
+}
+
+#assignment-table thead tr:first-child th.sortable-header {
+  padding: 0;
+}
+
+#assignment-table thead tr:first-child th.sortable-header .sort-button {
+  padding: 12px 16px;
+  min-height: 100%;
+}
+
+.table thead th.sorted-col {
+  background: #fbf2e6;
+  color: var(--ink);
+}
+
+body.theme-dark .table thead th.sorted-col {
+  background: #2a221b;
+}
+
 .sort-button {
   border: none;
   background: none;
-  padding: 0;
+  padding: 2px 0;
   font: inherit;
   color: inherit;
   text-transform: inherit;
@@ -883,6 +931,8 @@ body.theme-dark .chart-empty {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  width: 100%;
+  justify-content: flex-start;
 }
 
 .info-tooltip {

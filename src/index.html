@@ -110,9 +110,25 @@
             <label for="assignment-role-select">Security role</label>
             <select id="assignment-role-select"></select>
           </div>
+          <div class="control" id="assignment-role-filter-control">
+            <label for="assignment-role-filter">Role filter</label>
+            <select id="assignment-role-filter">
+              <option value="">All roles</option>
+              <option value="with">With assigned</option>
+              <option value="without">Without assigned</option>
+            </select>
+          </div>
           <div class="control" id="assignment-user-control">
             <label for="assignment-user-select">User</label>
             <select id="assignment-user-select"></select>
+          </div>
+          <div class="control" id="assignment-user-filter-control" style="display:none">
+            <label for="assignment-user-filter">User filter</label>
+            <select id="assignment-user-filter">
+              <option value="">All users</option>
+              <option value="with">With assigned roles</option>
+              <option value="without">Without assigned roles</option>
+            </select>
           </div>
           <div class="control" id="assignment-team-control">
             <label for="assignment-team-select">Team</label>
@@ -326,8 +342,7 @@
               <p id="assignment-status" class="subtitle">Select a role or user to view assignments.</p>
             </div>
             <div class="panel-actions">
-              <button id="assignment-add" class="btn">Add</button>
-              <button id="assignment-remove" class="btn">Remove</button>
+              <button id="assignment-update" class="btn">Update</button>
               <span id="assignment-count" class="pending-count hidden">0</span>
             </div>
           </div>
@@ -337,10 +352,10 @@
                 <thead>
                   <tr>
                     <th>
-                      <button class="sort-button" data-assign-sort="label">User / Role</button>
+                      <button class="sort-button" data-sort="label">User / Role</button>
                     </th>
                     <th>
-                      <button class="sort-button" data-assign-sort="assigned">Assigned</button>
+                      <button class="sort-button" data-sort="assigned">Assigned</button>
                     </th>
                     <th>Select</th>
                   </tr>
@@ -363,8 +378,8 @@
                     </th>
                     <th>
                       <div class="assignment-filter-actions">
-                        <button type="button" class="link-button" id="assignment-select-all">Select all</button>
-                        <button type="button" class="link-button" id="assignment-clear">Clear</button>
+                        <button type="button" class="link-button" id="assignment-select-all">Check all</button>
+                        <button type="button" class="link-button" id="assignment-clear">Uncheck all</button>
                       </div>
                     </th>
                   </tr>

@@ -110,7 +110,7 @@ const state = {
   cachePromise: null as Promise<boolean> | null,
   assignmentMode: "role" as AssignmentMode,
   assignmentItems: [] as AssignmentItem[],
-  selectedAssignmentIds: new Set<string>(),
+  assignmentPendingById: new Map<string, boolean>(),
   usersLoaded: false,
   teamsLoaded: false,
   roleByRootAndBu: new Map<string, string>(),
@@ -153,6 +153,8 @@ const state = {
     direction: "asc" as AssignmentSortDirection,
   },
   assignmentFilter: "" as "" | "assigned" | "not-assigned",
+  assignmentRoleFilter: "" as "" | "with" | "without",
+  assignmentUserFilter: "" as "" | "with" | "without",
   assignmentSearch: "",
   privilegeSearch: "",
   sort: {
@@ -243,12 +245,23 @@ const elements = {
   assignmentTeamControl: document.getElementById(
     "assignment-team-control",
   ) as HTMLDivElement,
+  assignmentRoleFilterControl: document.getElementById(
+    "assignment-role-filter-control",
+  ) as HTMLDivElement,
+  assignmentRoleFilter: document.getElementById(
+    "assignment-role-filter",
+  ) as HTMLSelectElement,
+  assignmentUserFilterControl: document.getElementById(
+    "assignment-user-filter-control",
+  ) as HTMLDivElement,
+  assignmentUserFilter: document.getElementById(
+    "assignment-user-filter",
+  ) as HTMLSelectElement,
   assignmentTitle: document.getElementById(
     "assignment-title",
   ) as HTMLHeadingElement,
-  assignmentAdd: document.getElementById("assignment-add") as HTMLButtonElement,
-  assignmentRemove: document.getElementById(
-    "assignment-remove",
+  assignmentUpdate: document.getElementById(
+    "assignment-update",
   ) as HTMLButtonElement,
   assignmentCount: document.getElementById(
     "assignment-count",
@@ -265,9 +278,6 @@ const elements = {
   assignmentTableBody: document.getElementById(
     "assignment-table-body",
   ) as HTMLTableSectionElement,
-  assignmentSortButtons: Array.from(
-    document.querySelectorAll("[data-assign-sort]"),
-  ) as HTMLButtonElement[],
   assignmentFilterAssigned: document.getElementById(
     "assignment-filter-assigned",
   ) as HTMLSelectElement,
@@ -652,6 +662,7 @@ function resetAssignmentCaches() {
   state.assignmentUserRolesPromise = null;
   state.assignmentTeamRolesLoading = false;
   state.assignmentTeamRolesPromise = null;
+  state.assignmentPendingById.clear();
 }
 
 function resetDashboardCaches() {
@@ -801,18 +812,19 @@ function updatePendingUi() {
   }
 }
 
-function updateAssignmentSelectionUi() {
-  const count = state.selectedAssignmentIds.size;
-  if (elements.assignmentAdd) {
-    elements.assignmentAdd.disabled = count === 0;
-  }
-  if (elements.assignmentRemove) {
-    elements.assignmentRemove.disabled = count === 0;
+function updateAssignmentUpdateUi() {
+  const count = state.assignmentPendingById.size;
+  if (elements.assignmentUpdate) {
+    elements.assignmentUpdate.disabled = count === 0;
   }
   if (elements.assignmentCount) {
     elements.assignmentCount.textContent = `${count}`;
     elements.assignmentCount.classList.toggle("hidden", count === 0);
   }
+}
+
+function getEffectiveAssignmentState(item: AssignmentItem): boolean {
+  return state.assignmentPendingById.get(item.id) ?? item.assigned;
 }
 
 async function setCustomRolesOnly(enabled: boolean, silent = false) {
@@ -1059,6 +1071,12 @@ function setAssignmentMode(mode: AssignmentMode) {
   if (elements.assignmentTeamControl) {
     elements.assignmentTeamControl.style.display = showTeam ? "flex" : "none";
   }
+  if (elements.assignmentRoleFilterControl) {
+    elements.assignmentRoleFilterControl.style.display = showRole ? "flex" : "none";
+  }
+  if (elements.assignmentUserFilterControl) {
+    elements.assignmentUserFilterControl.style.display = showUser ? "flex" : "none";
+  }
 }
 
 function setAssignmentStatus(text: string) {
@@ -1068,12 +1086,27 @@ function setAssignmentStatus(text: string) {
 }
 
 function updateAssignmentSortIndicators() {
-  for (const button of elements.assignmentSortButtons) {
+  for (const button of elements.sortButtons) {
     button.classList.remove("sort-asc", "sort-desc");
-    if (button.dataset.assignSort === state.assignmentSort.column) {
+    const header = button.closest("th");
+    if (header) {
+      header.classList.remove("sorted-col", "sorted-asc", "sorted-desc");
+      header.setAttribute("aria-sort", "none");
+    }
+    if (button.dataset.sort === state.assignmentSort.column) {
       button.classList.add(
         state.assignmentSort.direction === "asc" ? "sort-asc" : "sort-desc",
       );
+      if (header) {
+        header.classList.add("sorted-col");
+        if (state.assignmentSort.direction === "asc") {
+          header.classList.add("sorted-asc");
+          header.setAttribute("aria-sort", "ascending");
+        } else {
+          header.classList.add("sorted-desc");
+          header.setAttribute("aria-sort", "descending");
+        }
+      }
     }
   }
 }
@@ -1091,11 +1124,12 @@ function mapTeamTypeLabel(teamType: number | null): string {
 
 function applyAssignmentSortAndFilter(items: AssignmentItem[]) {
   const filtered = items.filter((item) => {
+    const effectiveAssigned = getEffectiveAssignmentState(item);
     if (state.assignmentFilter === "assigned") {
-      return item.assigned;
+      return effectiveAssigned;
     }
     if (state.assignmentFilter === "not-assigned") {
-      return !item.assigned;
+      return !effectiveAssigned;
     }
     if (state.assignmentSearch) {
       const rawTerm = state.assignmentSearch.toLowerCase();
@@ -1120,8 +1154,8 @@ function applyAssignmentSortAndFilter(items: AssignmentItem[]) {
       });
       return state.assignmentSort.direction === "asc" ? cmp : -cmp;
     }
-    const aRank = a.assigned ? 1 : 2;
-    const bRank = b.assigned ? 1 : 2;
+    const aRank = getEffectiveAssignmentState(a) ? 1 : 2;
+    const bRank = getEffectiveAssignmentState(b) ? 1 : 2;
     const diff =
       state.assignmentSort.direction === "asc" ? aRank - bRank : bRank - aRank;
     if (diff !== 0) {
@@ -1133,8 +1167,6 @@ function applyAssignmentSortAndFilter(items: AssignmentItem[]) {
 
 function renderAssignmentTable(items: AssignmentItem[]) {
   state.assignmentItems = items;
-  const previouslySelected = new Set(state.selectedAssignmentIds);
-  state.selectedAssignmentIds.clear();
   if (!elements.assignmentTableBody) {
     return;
   }
@@ -1155,37 +1187,39 @@ function renderAssignmentTable(items: AssignmentItem[]) {
       labelCell.appendChild(sub);
     }
 
+    const isPending = state.assignmentPendingById.has(item.id);
+
     const statusCell = document.createElement("td");
     const status = document.createElement("div");
     status.className = "assignment-status-pill";
-    status.textContent = item.assigned
+    const effectiveAssigned = getEffectiveAssignmentState(item);
+    status.textContent = effectiveAssigned
       ? UI_TEXT.statusAssigned
       : UI_TEXT.statusNotAssigned;
+    status.classList.toggle("pending-change", isPending);
     statusCell.appendChild(status);
 
     const selectCell = document.createElement("td");
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
-    checkbox.checked = previouslySelected.has(item.id);
-    if (checkbox.checked) {
-      state.selectedAssignmentIds.add(item.id);
-    }
+    checkbox.checked = effectiveAssigned;
     checkbox.addEventListener("change", () => {
-      if (checkbox.checked) {
-        state.selectedAssignmentIds.add(item.id);
+      if (checkbox.checked === item.assigned) {
+        state.assignmentPendingById.delete(item.id);
       } else {
-        state.selectedAssignmentIds.delete(item.id);
+        state.assignmentPendingById.set(item.id, checkbox.checked);
       }
-      updateAssignmentSelectionUi();
+      renderAssignmentTable(state.assignmentItems);
     });
     selectCell.appendChild(checkbox);
 
+    tr.classList.toggle("assignment-row-pending", isPending);
     tr.appendChild(labelCell);
     tr.appendChild(statusCell);
     tr.appendChild(selectCell);
     elements.assignmentTableBody.appendChild(tr);
   }
-  updateAssignmentSelectionUi();
+  updateAssignmentUpdateUi();
 }
 
 function syncRoleFilterSelection() {
@@ -1305,10 +1339,25 @@ function renderFilterOptions() {
 function updateSortIndicators() {
   for (const button of elements.sortButtons) {
     button.classList.remove("sort-asc", "sort-desc");
+    const header = button.closest("th");
+    if (header) {
+      header.classList.remove("sorted-col", "sorted-asc", "sorted-desc");
+      header.setAttribute("aria-sort", "none");
+    }
     if (button.dataset.sort === state.sort.column) {
       button.classList.add(
         state.sort.direction === "asc" ? "sort-asc" : "sort-desc",
       );
+      if (header) {
+        header.classList.add("sorted-col");
+        if (state.sort.direction === "asc") {
+          header.classList.add("sorted-asc");
+          header.setAttribute("aria-sort", "ascending");
+        } else {
+          header.classList.add("sorted-desc");
+          header.setAttribute("aria-sort", "descending");
+        }
+      }
     }
   }
 }
@@ -2093,9 +2142,17 @@ function renderAssignmentRoleOptionsWithCounts(
   unitLabel: string,
   counts: Map<string, number>,
 ) {
+  const filter = state.assignmentRoleFilter;
+  const filteredRoles =
+    filter === ""
+      ? state.roles
+      : state.roles.filter((role) => {
+          const count = counts.get(role.id) ?? 0;
+          return filter === "with" ? count > 0 : count === 0;
+        });
   renderSelectOptionsWithSelection(
     elements.assignmentRoleSelect,
-    state.roles,
+    filteredRoles,
     (item) => item.id,
     (item) =>
       formatAssignmentSelectLabel(
@@ -2111,9 +2168,17 @@ function renderAssignmentUserOptionsWithCounts(
   unitLabel: string,
   counts: Map<string, number>,
 ) {
+  const filter = state.assignmentUserFilter;
+  const filteredUsers =
+    filter === ""
+      ? state.users
+      : state.users.filter((user) => {
+          const count = counts.get(user.id) ?? 0;
+          return filter === "with" ? count > 0 : count === 0;
+        });
   renderSelectOptionsWithSelection(
     elements.assignmentUserSelect,
-    state.users,
+    filteredUsers,
     (item) => item.id,
     (item) =>
       formatAssignmentSelectLabel(
@@ -3301,6 +3366,7 @@ async function loadAssignmentView() {
   if (!state.allRoles.length) {
     await loadRoles();
   }
+  state.assignmentPendingById.clear();
   if (state.assignmentMode === "role") {
     if (!state.usersLoaded) {
       await loadUsers();
@@ -3341,7 +3407,7 @@ async function loadAssignmentView() {
       );
     }
     setAssignmentStatus(UI_TEXT.assignmentSelectUsersForRole);
-    updateAssignmentSelectionUi();
+    updateAssignmentUpdateUi();
   } else if (state.assignmentMode === "user") {
     if (!state.usersLoaded) {
       await loadUsers();
@@ -3377,7 +3443,7 @@ async function loadAssignmentView() {
       );
     }
     setAssignmentStatus(UI_TEXT.assignmentSelectRolesForUser);
-    updateAssignmentSelectionUi();
+    updateAssignmentUpdateUi();
   } else if (state.assignmentMode === "role-team") {
     if (!state.teamsLoaded) {
       await loadTeams();
@@ -3416,7 +3482,7 @@ async function loadAssignmentView() {
       );
     }
     setAssignmentStatus(UI_TEXT.assignmentSelectTeamsForRole);
-    updateAssignmentSelectionUi();
+    updateAssignmentUpdateUi();
   } else {
     if (!state.teamsLoaded) {
       await loadTeams();
@@ -3452,11 +3518,15 @@ async function loadAssignmentView() {
       );
     }
     setAssignmentStatus(UI_TEXT.assignmentSelectRolesForTeam);
-    updateAssignmentSelectionUi();
+    updateAssignmentUpdateUi();
   }
 }
 
-async function applyAssignmentChange(action: "add" | "remove") {
+async function applyAssignmentUpdates() {
+  if (state.assignmentPendingById.size === 0) {
+    return;
+  }
+
   if (state.assignmentMode === "role") {
     const roleRootId = elements.assignmentRoleSelect.value;
     if (!roleRootId) {
@@ -3464,9 +3534,9 @@ async function applyAssignmentChange(action: "add" | "remove") {
     }
     const roleName =
       state.roles.find((role) => role.id === roleRootId)?.name ?? roleRootId;
-    const processedUsers: string[] = [];
-    const selectedUsers = Array.from(state.selectedAssignmentIds);
-    for (const userId of selectedUsers) {
+    const addedUsers: string[] = [];
+    const removedUsers: string[] = [];
+    for (const [userId, shouldBeAssigned] of state.assignmentPendingById) {
       const user = state.users.find((item) => item.id === userId);
       if (!user) {
         continue;
@@ -3475,16 +3545,22 @@ async function applyAssignmentChange(action: "add" | "remove") {
       if (!roleId) {
         continue;
       }
-      if (action === "add") {
+      if (shouldBeAssigned) {
         await associateRoleToUser(userId, roleId);
+        addedUsers.push(user.name);
       } else {
         await disassociateRoleFromUser(userId, roleId);
+        removedUsers.push(user.name);
       }
-      processedUsers.push(user.name);
     }
-    if (processedUsers.length > 0) {
+    if (addedUsers.length > 0) {
       logMessage(
-        formatRoleAssignmentLogUsers(action, roleName, processedUsers),
+        formatRoleAssignmentLogUsers("add", roleName, addedUsers),
+      );
+    }
+    if (removedUsers.length > 0) {
+      logMessage(
+        formatRoleAssignmentLogUsers("remove", roleName, removedUsers),
       );
     }
   } else if (state.assignmentMode === "user") {
@@ -3496,25 +3572,33 @@ async function applyAssignmentChange(action: "add" | "remove") {
     if (!user) {
       return;
     }
-    const processedRoles: string[] = [];
-    const selectedRoles = Array.from(state.selectedAssignmentIds);
-    for (const roleRootId of selectedRoles) {
+    const addedRoles: string[] = [];
+    const removedRoles: string[] = [];
+    for (const [roleRootId, shouldBeAssigned] of state.assignmentPendingById) {
       const roleId = await resolveRoleForUser(roleRootId, user.businessUnitId);
       if (!roleId) {
         continue;
       }
-      if (action === "add") {
+      if (shouldBeAssigned) {
         await associateRoleToUser(userId, roleId);
+        const roleName =
+          state.roles.find((role) => role.id === roleRootId)?.name ?? roleRootId;
+        addedRoles.push(roleName);
       } else {
         await disassociateRoleFromUser(userId, roleId);
+        const roleName =
+          state.roles.find((role) => role.id === roleRootId)?.name ?? roleRootId;
+        removedRoles.push(roleName);
       }
-      const roleName =
-        state.roles.find((role) => role.id === roleRootId)?.name ?? roleRootId;
-      processedRoles.push(roleName);
     }
-    if (processedRoles.length > 0) {
+    if (addedRoles.length > 0) {
       logMessage(
-        formatRoleAssignmentLogRolesForUser(action, user.name, processedRoles),
+        formatRoleAssignmentLogRolesForUser("add", user.name, addedRoles),
+      );
+    }
+    if (removedRoles.length > 0) {
+      logMessage(
+        formatRoleAssignmentLogRolesForUser("remove", user.name, removedRoles),
       );
     }
   } else if (state.assignmentMode === "role-team") {
@@ -3524,9 +3608,9 @@ async function applyAssignmentChange(action: "add" | "remove") {
     }
     const roleName =
       state.roles.find((role) => role.id === roleRootId)?.name ?? roleRootId;
-    const processedTeams: string[] = [];
-    const selectedTeams = Array.from(state.selectedAssignmentIds);
-    for (const teamId of selectedTeams) {
+    const addedTeams: string[] = [];
+    const removedTeams: string[] = [];
+    for (const [teamId, shouldBeAssigned] of state.assignmentPendingById) {
       const team = state.teams.find((item) => item.id === teamId);
       if (!team) {
         continue;
@@ -3535,16 +3619,22 @@ async function applyAssignmentChange(action: "add" | "remove") {
       if (!roleId) {
         continue;
       }
-      if (action === "add") {
+      if (shouldBeAssigned) {
         await associateRoleToTeam(teamId, roleId);
+        addedTeams.push(team.name);
       } else {
         await disassociateRoleFromTeam(teamId, roleId);
+        removedTeams.push(team.name);
       }
-      processedTeams.push(team.name);
     }
-    if (processedTeams.length > 0) {
+    if (addedTeams.length > 0) {
       logMessage(
-        formatRoleAssignmentLogTeams(action, roleName, processedTeams),
+        formatRoleAssignmentLogTeams("add", roleName, addedTeams),
+      );
+    }
+    if (removedTeams.length > 0) {
+      logMessage(
+        formatRoleAssignmentLogTeams("remove", roleName, removedTeams),
       );
     }
   } else {
@@ -3556,25 +3646,37 @@ async function applyAssignmentChange(action: "add" | "remove") {
     if (!team) {
       return;
     }
-    const processedRoles: string[] = [];
-    const selectedRoles = Array.from(state.selectedAssignmentIds);
-    for (const roleRootId of selectedRoles) {
+    const addedRoles: string[] = [];
+    const removedRoles: string[] = [];
+    for (const [roleRootId, shouldBeAssigned] of state.assignmentPendingById) {
       const roleId = await resolveRoleForTeam(roleRootId, team.businessUnitId);
       if (!roleId) {
         continue;
       }
-      if (action === "add") {
+      if (shouldBeAssigned) {
         await associateRoleToTeam(teamId, roleId);
+        const roleName =
+          state.roles.find((role) => role.id === roleRootId)?.name ?? roleRootId;
+        addedRoles.push(roleName);
       } else {
         await disassociateRoleFromTeam(teamId, roleId);
+        const roleName =
+          state.roles.find((role) => role.id === roleRootId)?.name ?? roleRootId;
+        removedRoles.push(roleName);
       }
-      const roleName =
-        state.roles.find((role) => role.id === roleRootId)?.name ?? roleRootId;
-      processedRoles.push(roleName);
     }
-    if (processedRoles.length > 0) {
+    if (addedRoles.length > 0) {
       logMessage(
-        formatRoleAssignmentLogRolesForTeam(action, team.name, processedRoles),
+        formatRoleAssignmentLogRolesForTeam("add", team.name, addedRoles),
+      );
+    }
+    if (removedRoles.length > 0) {
+      logMessage(
+        formatRoleAssignmentLogRolesForTeam(
+          "remove",
+          team.name,
+          removedRoles,
+        ),
       );
     }
   }
@@ -4016,29 +4118,50 @@ function wireEvents() {
       loadAssignmentView();
     }
   });
-  elements.assignmentAdd.addEventListener("click", () =>
-    applyAssignmentChange("add"),
-  );
-  elements.assignmentRemove.addEventListener("click", () =>
-    applyAssignmentChange("remove"),
-  );
+  if (elements.assignmentRoleFilter) {
+    elements.assignmentRoleFilter.addEventListener("change", () => {
+      state.assignmentRoleFilter = elements.assignmentRoleFilter.value as
+        | ""
+        | "with"
+        | "without";
+      loadAssignmentView();
+    });
+  }
+  if (elements.assignmentUserFilter) {
+    elements.assignmentUserFilter.addEventListener("change", () => {
+      state.assignmentUserFilter = elements.assignmentUserFilter.value as
+        | ""
+        | "with"
+        | "without";
+      loadAssignmentView();
+    });
+  }
+  elements.assignmentUpdate.addEventListener("click", applyAssignmentUpdates);
   elements.assignmentSelectAll.addEventListener("click", () => {
-    state.selectedAssignmentIds = new Set(
-      state.assignmentItems.map((item) => item.id),
-    );
+    state.assignmentPendingById.clear();
+    for (const item of state.assignmentItems) {
+      if (item.assigned) {
+        continue;
+      }
+      state.assignmentPendingById.set(item.id, true);
+    }
     renderAssignmentTable(state.assignmentItems);
-    updateAssignmentSelectionUi();
   });
   elements.assignmentClear.addEventListener("click", () => {
-    state.selectedAssignmentIds.clear();
+    state.assignmentPendingById.clear();
+    for (const item of state.assignmentItems) {
+      if (!item.assigned) {
+        continue;
+      }
+      state.assignmentPendingById.set(item.id, false);
+    }
     renderAssignmentTable(state.assignmentItems);
-    updateAssignmentSelectionUi();
   });
 
-  for (const button of elements.assignmentSortButtons) {
+  for (const button of elements.sortButtons) {
     button.addEventListener("click", () => {
       const column =
-        (button.dataset.assignSort as AssignmentSortColumn) || "label";
+        (button.dataset.sort as AssignmentSortColumn) || "label";
       if (state.assignmentSort.column === column) {
         state.assignmentSort.direction =
           state.assignmentSort.direction === "asc" ? "desc" : "asc";
@@ -4049,6 +4172,18 @@ function wireEvents() {
       updateAssignmentSortIndicators();
       renderAssignmentTable(state.assignmentItems);
     });
+
+    const header = button.closest("th");
+    if (header) {
+      header.classList.add("sortable-header");
+      header.addEventListener("click", (event) => {
+        const target = event.target as Node;
+        if (button.contains(target)) {
+          return;
+        }
+        button.click();
+      });
+    }
   }
 
   if (elements.assignmentFilterAssigned) {
@@ -4096,6 +4231,18 @@ function wireEvents() {
       updateSortIndicators();
       renderPrivilegeTable();
     });
+
+    const header = button.closest("th");
+    if (header) {
+      header.classList.add("sortable-header");
+      header.addEventListener("click", (event) => {
+        const target = event.target as Node;
+        if (button.contains(target)) {
+          return;
+        }
+        button.click();
+      });
+    }
   }
 
   for (const button of elements.bulkApplyButtons) {
