@@ -901,6 +901,8 @@ function applyRoleFilterToUi() {
   if (state.cacheLoaded) {
     if (state.filterMode === "entity" && state.entities.length > 0) {
       loadEntityCoverage(elements.entitySelect.value);
+    } else if (state.filterMode === "misc" && elements.miscSelect.value) {
+      loadMiscCoverageView(elements.miscSelect.value);
     } else if (state.filterMode === "role" && elements.roleSelect.value) {
       loadRolePrivileges(elements.roleSelect.value);
     }
