@@ -35,6 +35,8 @@ import {
   EntitySummary,
   PendingChange,
   PrivilegeInfo,
+  MiscPrivilegeInfo,
+  MiscPendingChange,
 } from "./types/securityRole";
 import {
   BusinessUnitSummary,
@@ -65,6 +67,7 @@ import {
   formatNoPrivilegesForRole,
   formatPrivilegesForRoleTitle,
   formatPrivilegesForTableTitle,
+  formatPrivilegesForMiscTitle,
   formatRoleAssignmentLogRolesForTeam,
   formatRoleAssignmentLogRolesForUser,
   formatRoleAssignmentLogTeams,
@@ -104,7 +107,7 @@ const state = {
   roleFilterSearch: "",
   hideManagedRoles: false,
   currentTab: "privileges" as "privileges" | "assignments" | "dashboard",
-  rightsFilter: "all" as "all" | "with" | "without",
+  rightsFilter: "all" as "all" | "with" | "without" | "misc" | "entities",
   cacheLoaded: false,
   cacheLoading: false,
   cachePromise: null as Promise<boolean> | null,
@@ -179,6 +182,11 @@ const state = {
     loaded: 0,
     total: 0,
   },
+  miscPrivileges: [] as MiscPrivilegeInfo[],
+  miscRolePrivileges: new Map<string, Map<string, PrivilegeLevel>>(),
+  miscPendingChanges: [] as MiscPendingChange[],
+  miscPrivilegeRowsForRole: [] as Array<MiscPrivilegeInfo & { level: PrivilegeLevel }>,
+  miscModeRoleRows: [] as Array<{ roleId: string; label: string; level: PrivilegeLevel; privilegeId: string }>,
 };
 
 const elements = {
@@ -194,6 +202,10 @@ const elements = {
   entitySelectControl: document.getElementById(
     "entity-select-control",
   ) as HTMLDivElement,
+  miscSelectControl: document.getElementById(
+    "misc-select-control",
+  ) as HTMLDivElement,
+  miscSelect: document.getElementById("misc-select") as HTMLSelectElement,
   rightsFilter: document.getElementById("rights-filter") as HTMLSelectElement,
   roleFilterControl: document.getElementById(
     "role-filter-control",
@@ -424,6 +436,7 @@ const searchableSelectInstances = new Map<string, SearchableSelectInstance>();
 const searchableSelectIds = [
   "role-select",
   "entity-select",
+  "misc-select",
   "assignment-role-select",
   "assignment-user-select",
   "assignment-team-select",
@@ -641,8 +654,12 @@ function resetSecurityCache(clearPending: boolean) {
   state.privilegeInfoById = new Map();
   state.rolePrivileges = new Map();
   state.privilegeRows = [];
+  state.miscPrivileges = [];
+  state.miscRolePrivileges = new Map();
+  state.miscModeRoleRows = [];
   if (clearPending) {
     state.pendingChanges = [];
+    state.miscPendingChanges = [];
     updatePendingUi();
   }
 }
@@ -799,7 +816,7 @@ function isActiveUser(user: DashboardUser): boolean {
 }
 
 function updatePendingUi() {
-  const count = state.pendingChanges.length;
+  const count = state.pendingChanges.length + state.miscPendingChanges.length;
   if (elements.applyBtn) {
     elements.applyBtn.disabled = count === 0;
   }
@@ -1270,8 +1287,10 @@ function renderRoleFilterOptions() {
         state.selectedRoleIds.delete(role.id);
       }
       updateRoleFilterLabel();
-      if (state.tableMode === "entity") {
+      if (state.filterMode === "entity") {
         loadEntityCoverage(elements.entitySelect.value);
+      } else if (state.filterMode === "misc" && elements.miscSelect.value) {
+        loadMiscCoverageView(elements.miscSelect.value);
       }
     });
     const text = document.createElement("span");
@@ -1309,8 +1328,10 @@ function getFilteredRolesForRoleFilter(): RoleSummary[] {
 
 function refreshRoleFilterResults() {
   renderRoleFilterOptions();
-  if (state.tableMode === "entity") {
+  if (state.filterMode === "entity") {
     loadEntityCoverage(elements.entitySelect.value);
+  } else if (state.filterMode === "misc" && elements.miscSelect.value) {
+    loadMiscCoverageView(elements.miscSelect.value);
   }
 }
 
@@ -1643,6 +1664,9 @@ function applySortAndFilters(rows: PrivilegeRow[]): PrivilegeRow[] {
     if (state.rightsFilter === "without" && hasAnyRights(row)) {
       return false;
     }
+    if (state.rightsFilter === "misc") {
+      return false;
+    }
     for (const privilege of accessRights) {
       const filterValue = state.filters[privilege];
       if (!filterValue) {
@@ -1657,6 +1681,12 @@ function applySortAndFilters(rows: PrivilegeRow[]): PrivilegeRow[] {
       }
       if (!available) {
         return false;
+      }
+      if (filterValue === "any") {
+        if (row[privilege] === "none") {
+          return false;
+        }
+        continue;
       }
       if (row[privilege] !== filterValue) {
         return false;
@@ -1698,7 +1728,97 @@ function applySortAndFilters(rows: PrivilegeRow[]): PrivilegeRow[] {
 
 function renderPrivilegeTable() {
   elements.privilegesTable.innerHTML = "";
+  const isMiscMode = state.tableMode === "misc";
   const isRoleMode = state.tableMode === "role";
+  const tableElement = elements.privilegesTable.closest("table");
+
+  if (isMiscMode) {
+    if (tableElement) {
+      tableElement.classList.remove("hide-ownership");
+      tableElement.classList.add("table-mode-misc");
+    }
+    const miscPrivId = state.miscModeRoleRows[0]?.privilegeId ?? "";
+    const miscInfo = state.miscPrivileges.find((m) => m.id === miscPrivId);
+    const allowedLevels: PrivilegeLevel[] = ["none"];
+    if (miscInfo?.canBeBasic) allowedLevels.push("user");
+    if (miscInfo?.canBeLocal) allowedLevels.push("businessUnit");
+    if (miscInfo?.canBeDeep) allowedLevels.push("parentChild");
+    if (miscInfo?.canBeGlobal) allowedLevels.push("organization");
+    const visibleRows = state.miscModeRoleRows.filter((row) => {
+      const pendingChange = state.miscPendingChanges.find(
+        (c) => c.roleId === row.roleId && c.privilegeId === row.privilegeId,
+      );
+      const effectiveLevel = pendingChange?.level ?? row.level;
+      if (state.rightsFilter === "with" && effectiveLevel === "none") return false;
+      if (state.rightsFilter === "without" && effectiveLevel !== "none") return false;
+      if (state.privilegeSearch) {
+        const term = state.privilegeSearch.toLowerCase();
+        return row.label.toLowerCase().includes(term);
+      }
+      return true;
+    });
+    const sorted = [...visibleRows].sort((a, b) => {
+      const cmp = a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
+      return state.sort.direction === "asc" ? cmp : -cmp;
+    });
+    for (const row of sorted) {
+      const pendingChange = state.miscPendingChanges.find(
+        (c) => c.roleId === row.roleId && c.privilegeId === row.privilegeId,
+      );
+      const isPending = Boolean(pendingChange);
+      const effectiveLevel = pendingChange?.level ?? row.level;
+      const tr = document.createElement("tr");
+      const labelTd = document.createElement("td");
+      const labelSpan = document.createElement("span");
+      labelSpan.textContent = row.label;
+      labelTd.appendChild(labelSpan);
+      tr.appendChild(labelTd);
+      const levelTd = document.createElement("td");
+      levelTd.className = "misc-only";
+      const select = document.createElement("select");
+      select.className = "level-select";
+      for (const optionMeta of levelOptions) {
+        if (!allowedLevels.includes(optionMeta.level)) continue;
+        const option = document.createElement("option");
+        option.value = optionMeta.level;
+        option.textContent = `${optionMeta.icon} ${optionMeta.label}`;
+        option.className = optionMeta.className;
+        option.style.color = getLevelColor(optionMeta.level);
+        if (effectiveLevel === optionMeta.level) option.selected = true;
+        select.appendChild(option);
+      }
+      applyLevelClass(select, effectiveLevel);
+      setPendingClass(select, isPending);
+      select.addEventListener("change", () => {
+        const newLevel = select.value as PrivilegeLevel;
+        const serverLevel =
+          (state.miscRolePrivileges.get(row.roleId) ?? new Map()).get(row.privilegeId) ?? "none";
+        const existingIdx = state.miscPendingChanges.findIndex(
+          (c) => c.roleId === row.roleId && c.privilegeId === row.privilegeId,
+        );
+        if (newLevel === serverLevel) {
+          if (existingIdx !== -1) state.miscPendingChanges.splice(existingIdx, 1);
+        } else if (existingIdx !== -1) {
+          state.miscPendingChanges[existingIdx].level = newLevel;
+        } else {
+          state.miscPendingChanges.push({ roleId: row.roleId, privilegeId: row.privilegeId, level: newLevel });
+        }
+        applyLevelClass(select, newLevel);
+        setPendingClass(select, newLevel !== serverLevel);
+        updatePendingUi();
+      });
+      levelTd.appendChild(select);
+      tr.appendChild(levelTd);
+      elements.privilegesTable.appendChild(tr);
+    }
+    updatePendingUi();
+    return;
+  }
+
+  if (tableElement) {
+    tableElement.classList.remove("table-mode-misc");
+  }
+
   const rows = applySortAndFilters(state.privilegeRows);
   renderBulkControls(rows, isRoleMode);
 
@@ -1706,7 +1826,6 @@ function renderPrivilegeTable() {
     elements.tableEmpty.classList.toggle("hidden", state.cacheLoaded);
   }
 
-  const tableElement = elements.privilegesTable.closest("table");
   if (tableElement) {
     tableElement.classList.toggle("hide-ownership", !isRoleMode);
   }
@@ -1798,19 +1917,164 @@ function renderPrivilegeTable() {
     elements.privilegesTable.appendChild(tr);
   }
 
+  // Miscellaneous privileges section (role mode only)
+  const showMiscSection = state.rightsFilter !== "entities";
+  if (isRoleMode && showMiscSection && state.miscPrivilegeRowsForRole.length > 0) {
+    const roleId = elements.roleSelect.value;
+    const miscRows = state.miscPrivilegeRowsForRole.filter((misc) => {
+      const pendingChange = state.miscPendingChanges.find(
+        (c) => c.roleId === roleId && c.privilegeId === misc.id,
+      );
+      const effectiveLevel = pendingChange?.level ?? misc.level;
+
+      if (state.privilegeSearch) {
+        const term = state.privilegeSearch.toLowerCase();
+        if (
+          !misc.label.toLowerCase().includes(term) &&
+          !misc.name.toLowerCase().includes(term)
+        ) {
+          return false;
+        }
+      }
+
+      // Apply active column filters against the misc row's single level
+      for (const privilege of accessRights) {
+        const filterValue = state.filters[privilege];
+        if (!filterValue) {
+          continue;
+        }
+        // Misc rows are never N/A, so hide them when the filter targets N/A
+        if (filterValue === "notAvailable") {
+          return false;
+        }
+        if (filterValue === "any") {
+          if (effectiveLevel === "none") {
+            return false;
+          }
+          continue;
+        }
+        if (effectiveLevel !== filterValue) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    if (miscRows.length > 0) {
+      // Section header
+      const headerTr = document.createElement("tr");
+      headerTr.className = "misc-section-header";
+      const headerTd = document.createElement("td");
+      headerTd.colSpan = 10;
+      headerTd.textContent = UI_TEXT.miscSectionTitle;
+      headerTr.appendChild(headerTd);
+      elements.privilegesTable.appendChild(headerTr);
+
+      for (const misc of miscRows) {
+        const pendingChange = state.miscPendingChanges.find(
+          (c) => c.roleId === roleId && c.privilegeId === misc.id,
+        );
+        const isPending = Boolean(pendingChange);
+        const effectiveLevel = pendingChange?.level ?? misc.level;
+
+        const allowedLevels: PrivilegeLevel[] = ["none"];
+        if (misc.canBeBasic) allowedLevels.push("user");
+        if (misc.canBeLocal) allowedLevels.push("businessUnit");
+        if (misc.canBeDeep) allowedLevels.push("parentChild");
+        if (misc.canBeGlobal) allowedLevels.push("organization");
+
+        const tr = document.createElement("tr");
+        tr.classList.toggle("misc-row-pending", isPending);
+
+        const labelTd = document.createElement("td");
+        const labelSpan = document.createElement("span");
+        labelSpan.textContent = misc.label;
+        labelSpan.title = misc.name;
+        labelTd.appendChild(labelSpan);
+        tr.appendChild(labelTd);
+
+        const ownershipTd = document.createElement("td");
+        ownershipTd.className = "ownership";
+        const miscBadge = document.createElement("span");
+        miscBadge.className = "misc-badge";
+        miscBadge.textContent = UI_TEXT.miscBadge;
+        ownershipTd.appendChild(miscBadge);
+        tr.appendChild(ownershipTd);
+
+        const levelTd = document.createElement("td");
+        levelTd.colSpan = 8;
+        levelTd.className = "misc-level-cell";
+
+        const select = document.createElement("select");
+        select.className = "level-select";
+        for (const optionMeta of levelOptions) {
+          if (!allowedLevels.includes(optionMeta.level)) {
+            continue;
+          }
+          const option = document.createElement("option");
+          option.value = optionMeta.level;
+          option.textContent = `${optionMeta.icon} ${optionMeta.label}`;
+          option.className = optionMeta.className;
+          option.style.color = getLevelColor(optionMeta.level);
+          if (effectiveLevel === optionMeta.level) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        }
+        applyLevelClass(select, effectiveLevel);
+        setPendingClass(select, isPending);
+        select.addEventListener("change", () => {
+          if (!roleId) return;
+          const newLevel = select.value as PrivilegeLevel;
+          const serverLevel =
+            (state.miscRolePrivileges.get(roleId) ?? new Map()).get(misc.id) ?? "none";
+          const existingIdx = state.miscPendingChanges.findIndex(
+            (c) => c.roleId === roleId && c.privilegeId === misc.id,
+          );
+          if (newLevel === serverLevel) {
+            if (existingIdx !== -1) {
+              state.miscPendingChanges.splice(existingIdx, 1);
+            }
+          } else if (existingIdx !== -1) {
+            state.miscPendingChanges[existingIdx].level = newLevel;
+          } else {
+            state.miscPendingChanges.push({ roleId, privilegeId: misc.id, level: newLevel });
+          }
+          applyLevelClass(select, newLevel);
+          setPendingClass(select, newLevel !== serverLevel);
+          tr.classList.toggle("misc-row-pending", newLevel !== serverLevel);
+          updatePendingUi();
+        });
+
+        levelTd.appendChild(select);
+        tr.appendChild(levelTd);
+        elements.privilegesTable.appendChild(tr);
+      }
+    }
+  }
+
   updatePendingUi();
 }
 
 function setFilterMode(mode: FilterMode) {
   state.filterMode = mode;
   const isRole = mode === "role";
+  const isEntity = mode === "entity";
+  const isMisc = mode === "misc";
   if (elements.roleSelectControl) {
     elements.roleSelectControl.style.display = isRole ? "flex" : "none";
   }
   if (elements.entitySelectControl) {
-    elements.entitySelectControl.style.display = isRole ? "none" : "flex";
+    elements.entitySelectControl.style.display = isEntity ? "flex" : "none";
   }
-  setRoleFilterVisibility(!isRole);
+  if (elements.miscSelectControl) {
+    elements.miscSelectControl.style.display = isMisc ? "flex" : "none";
+  }
+  setRoleFilterVisibility(isEntity || isMisc);
+  if (isMisc && state.miscPrivileges.length > 0) {
+    renderMiscSelectOptions();
+  }
 }
 
 function updateConnectionBadge(name: string) {
@@ -2057,6 +2321,14 @@ function mapAccessFromName(
   }
 
   return null;
+}
+
+function humanizeMiscPrivilegeName(name: string): string {
+  const without = name.startsWith("prv") ? name.slice(3) : name;
+  return without
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .trim();
 }
 
 function ensureRolePrivilegeRecord(
@@ -3149,10 +3421,24 @@ async function loadSecurityCache(): Promise<boolean> {
   >();
   const privilegeIdByKey = new Map<string, string>();
   const privilegeInfoById = new Map<string, PrivilegeInfo>();
+  const miscPrivilegesLocal: MiscPrivilegeInfo[] = [];
+  const miscPrivilegeIds = new Set<string>();
 
   for (const privilege of privileges) {
     const parsed = mapAccessFromName(privilege.name ?? "");
     if (!parsed) {
+      // Miscellaneous privilege — no standard entity prefix
+      const miscInfo: MiscPrivilegeInfo = {
+        id: privilege.privilegeid,
+        name: privilege.name ?? "",
+        label: humanizeMiscPrivilegeName(privilege.name ?? ""),
+        canBeBasic: Boolean(privilege.canbebasic),
+        canBeLocal: Boolean(privilege.canbelocal),
+        canBeDeep: Boolean(privilege.canbedeep),
+        canBeGlobal: Boolean(privilege.canbeglobal),
+      };
+      miscPrivilegesLocal.push(miscInfo);
+      miscPrivilegeIds.add(privilege.privilegeid);
       continue;
     }
     privilegeInfoById.set(privilege.privilegeid, {
@@ -3177,6 +3463,7 @@ async function loadSecurityCache(): Promise<boolean> {
     string,
     Map<string, Record<AccessRight, PrivilegeLevel>>
   >();
+  const miscRolePrivilegesCache = new Map<string, Map<string, PrivilegeLevel>>();
   const rolesToCache = state.allRoles.length > 0 ? state.allRoles : state.roles;
   let loadedRoles = 0;
   const batchSize = 5;
@@ -3193,6 +3480,7 @@ async function loadSecurityCache(): Promise<boolean> {
       const role = result.role;
       const roleEntries = result.entries ?? [];
       rolePrivilegesCache.set(role.id, new Map());
+      miscRolePrivilegesCache.set(role.id, new Map());
       if (roleEntries.length === 0) {
         logMessage(formatNoPrivilegesForRole(role.name));
       }
@@ -3214,6 +3502,13 @@ async function loadSecurityCache(): Promise<boolean> {
         if (!privilegeId) {
           continue;
         }
+        if (miscPrivilegeIds.has(privilegeId)) {
+          miscRolePrivilegesCache.get(role.id)!.set(
+            privilegeId,
+            mapPrivilegeLevelFromDepth(depth),
+          );
+          continue;
+        }
         const meta = privilegeMeta.get(privilegeId);
         if (!meta) {
           continue;
@@ -3230,6 +3525,10 @@ async function loadSecurityCache(): Promise<boolean> {
 
   state.privilegeIdByKey = privilegeIdByKey;
   state.privilegeInfoById = privilegeInfoById;
+  state.miscPrivileges = miscPrivilegesLocal.sort((a, b) =>
+    a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
+  );
+  state.miscRolePrivileges = miscRolePrivilegesCache;
   state.rolePrivileges = rolePrivilegesCache;
   state.cacheLoaded = true;
   logMessage(
@@ -3270,12 +3569,62 @@ async function refreshPrivilegeView() {
     if (roleId) {
       await loadRolePrivileges(roleId);
     }
-  } else {
+  } else if (state.filterMode === "entity") {
     const entityLogicalName = elements.entitySelect.value;
     if (entityLogicalName) {
       await loadEntityCoverage(entityLogicalName);
     }
+  } else if (state.filterMode === "misc") {
+    const miscId = elements.miscSelect.value;
+    if (miscId) {
+      await loadMiscCoverageView(miscId);
+    }
   }
+}
+
+function renderMiscSelectOptions() {
+  renderSelectOptionsWithSelection(
+    elements.miscSelect,
+    state.miscPrivileges,
+    (m) => m.id,
+    (m) => m.label,
+    (m) => `${m.label} ${m.name}`,
+  );
+}
+
+async function loadMiscCoverageView(privilegeId: string) {
+  const loaded = await ensureSecurityCacheLoaded();
+  if (!loaded) {
+    return;
+  }
+  if (state.miscPrivileges.length > 0 && elements.miscSelect.options.length === 0) {
+    renderMiscSelectOptions();
+  }
+  if (!privilegeId) {
+    return;
+  }
+  state.tableMode = "misc";
+  state.privilegeRows = [];
+  state.miscPrivilegeRowsForRole = [];
+  const miscInfo = state.miscPrivileges.find((m) => m.id === privilegeId);
+  const visibleRoles = state.roles.filter((role) =>
+    state.selectedRoleIds.has(role.id),
+  );
+  state.miscModeRoleRows = visibleRoles.map((role) => {
+    const pendingChange = state.miscPendingChanges.find(
+      (c) => c.roleId === role.id && c.privilegeId === privilegeId,
+    );
+    const serverLevel =
+      (state.miscRolePrivileges.get(role.id) ?? new Map()).get(privilegeId) ?? "none";
+    return {
+      roleId: role.id,
+      label: role.name,
+      level: pendingChange?.level ?? (serverLevel as PrivilegeLevel),
+      privilegeId,
+    };
+  });
+  renderPrivilegeTable();
+  setTableTitle(formatPrivilegesForMiscTitle(miscInfo?.label ?? privilegeId));
 }
 
 async function loadRolePrivileges(roleId: string) {
@@ -3308,6 +3657,17 @@ async function loadRolePrivileges(roleId: string) {
       appendto: record.appendto,
       assign: record.assign,
       share: record.share,
+    };
+  });
+  // Build misc privilege rows for this role
+  const miscRoleMap = state.miscRolePrivileges.get(roleId) ?? new Map();
+  state.miscPrivilegeRowsForRole = state.miscPrivileges.map((misc) => {
+    const pendingChange = state.miscPendingChanges.find(
+      (c) => c.roleId === roleId && c.privilegeId === misc.id,
+    );
+    return {
+      ...misc,
+      level: pendingChange?.level ?? miscRoleMap.get(misc.id) ?? "none",
     };
   });
   renderPrivilegeTable();
@@ -3689,7 +4049,8 @@ async function applyAssignmentUpdates() {
 }
 
 async function applyChanges() {
-  if (state.pendingChanges.length === 0) {
+  const totalChanges = state.pendingChanges.length + state.miscPendingChanges.length;
+  if (totalChanges === 0) {
     await toolboxAPI.utils.showNotification({
       title: NOTIFICATIONS.noChanges.title,
       body: NOTIFICATIONS.noChanges.body,
@@ -3699,7 +4060,7 @@ async function applyChanges() {
     return;
   }
 
-  logMessage(formatApplyingChanges(state.pendingChanges.length));
+  logMessage(formatApplyingChanges(totalChanges));
   const removesByRole = new Map<string, string[]>();
   const addsByRole = new Map<
     string,
@@ -3749,6 +4110,31 @@ async function applyChanges() {
     }
   }
 
+  // Collect misc pending changes into the same remove/add buckets
+  for (const change of state.miscPendingChanges) {
+    const miscInfo = state.miscPrivileges.find((m) => m.id === change.privilegeId);
+    const serverLevel =
+      (state.miscRolePrivileges.get(change.roleId) ?? new Map()).get(change.privilegeId) ?? "none";
+    if (serverLevel === change.level) {
+      continue;
+    }
+    if (change.level === "none") {
+      if (!removesByRole.has(change.roleId)) {
+        removesByRole.set(change.roleId, []);
+      }
+      removesByRole.get(change.roleId)!.push(change.privilegeId);
+    } else {
+      if (!addsByRole.has(change.roleId)) {
+        addsByRole.set(change.roleId, []);
+      }
+      addsByRole.get(change.roleId)!.push({
+        PrivilegeId: change.privilegeId,
+        Depth: mapPrivilegeDepthLabel(change.level),
+        PrivilegeName: miscInfo?.name,
+      });
+    }
+  }
+
   const totalRemoveCalls = Array.from(removesByRole.values()).reduce(
     (total, privilegeIds) => total + privilegeIds.length,
     0,
@@ -3794,6 +4180,14 @@ async function applyChanges() {
       );
       record[change.privilege] = change.level;
     }
+
+    // Update misc privilege cache with confirmed levels
+    for (const change of state.miscPendingChanges) {
+      if (!state.miscRolePrivileges.has(change.roleId)) {
+        state.miscRolePrivileges.set(change.roleId, new Map());
+      }
+      state.miscRolePrivileges.get(change.roleId)!.set(change.privilegeId, change.level);
+    }
   } catch (error) {
     console.error(error);
     await toolboxAPI.utils.showNotification({
@@ -3808,6 +4202,7 @@ async function applyChanges() {
   }
 
   state.pendingChanges = [];
+  state.miscPendingChanges = [];
   updatePendingUi();
   await refreshPrivilegeView();
 }
@@ -3892,8 +4287,15 @@ async function initialize() {
 }
 
 function wireEvents() {
-  elements.filterMode.addEventListener("change", () => {
-    setFilterMode(elements.filterMode.value as FilterMode);
+  elements.filterMode.addEventListener("change", async () => {
+    const mode = elements.filterMode.value as FilterMode;
+    setFilterMode(mode);
+    if (mode === "misc") {
+      const loaded = await ensureSecurityCacheLoaded();
+      if (loaded && elements.miscSelect.options.length === 0) {
+        renderMiscSelectOptions();
+      }
+    }
   });
   elements.roleSelect.addEventListener("change", () => {
     if (state.filterMode === "role") {
@@ -3903,6 +4305,11 @@ function wireEvents() {
   elements.entitySelect.addEventListener("change", () => {
     if (state.filterMode === "entity") {
       loadEntityCoverage(elements.entitySelect.value);
+    }
+  });
+  elements.miscSelect.addEventListener("change", () => {
+    if (state.filterMode === "misc" && elements.miscSelect.value) {
+      loadMiscCoverageView(elements.miscSelect.value);
     }
   });
   elements.roleFilterButton.addEventListener("click", () => {
@@ -3951,10 +4358,11 @@ function wireEvents() {
   elements.applyBtn.addEventListener("click", applyChanges);
   if (elements.undoBtn) {
     elements.undoBtn.addEventListener("click", () => {
-      if (state.pendingChanges.length === 0) {
+      if (state.pendingChanges.length === 0 && state.miscPendingChanges.length === 0) {
         return;
       }
       state.pendingChanges = [];
+      state.miscPendingChanges = [];
       updatePendingUi();
       renderPrivilegeTable();
       logMessage(UI_TEXT.logClearedPending);
@@ -3969,7 +4377,7 @@ function wireEvents() {
   }
   if (elements.rightsFilter) {
     elements.rightsFilter.addEventListener("change", async () => {
-      const value = elements.rightsFilter.value as "all" | "with" | "without";
+      const value = elements.rightsFilter.value as "all" | "with" | "without" | "misc" | "entities";
       state.rightsFilter = value;
       if (!state.cacheLoaded) {
         const loaded = await ensureSecurityCacheLoaded();

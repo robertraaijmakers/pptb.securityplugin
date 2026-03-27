@@ -27,6 +27,8 @@ export const UI_TEXT = {
   teamTypeAccess: "Access team",
   teamTypeDefault: "Team",
   tableCellEmpty: "-",
+  miscSectionTitle: "Miscellaneous Privileges",
+  miscBadge: "Misc",
   themeSwitchToLight: "Switch to light theme",
   themeSwitchToDark: "Switch to dark theme",
   assignmentSelectRoleUsers: "Select a role to view users.",
@@ -77,6 +79,7 @@ export const NOTIFICATIONS = {
 
 export const FILTER_OPTIONS = [
   { value: "", label: "All" },
+  { value: "any", label: "Any" },
   { value: "user", label: "User" },
   { value: "businessUnit", label: "Business Unit" },
   { value: "parentChild", label: "Parent: Child BU" },
@@ -99,6 +102,10 @@ export function formatPrivilegesForRoleTitle(roleName: string): string {
 
 export function formatPrivilegesForTableTitle(entityLabel: string): string {
   return `Privileges for table: ${entityLabel}`;
+}
+
+export function formatPrivilegesForMiscTitle(privLabel: string): string {
+  return `Privilege: ${privLabel}`;
 }
 
 export function formatAssignmentTitleUsersWithRole(

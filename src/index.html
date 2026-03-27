@@ -55,6 +55,7 @@
             <select id="filter-mode">
               <option value="role">By role</option>
               <option value="entity">By entity</option>
+              <option value="misc">By miscellaneous</option>
             </select>
           </div>
           <div class="control" id="role-select-control">
@@ -65,12 +66,18 @@
             <label for="entity-select">Entity</label>
             <select id="entity-select"></select>
           </div>
+          <div class="control" id="misc-select-control" style="display:none">
+            <label for="misc-select">Privilege</label>
+            <select id="misc-select"></select>
+          </div>
           <div class="control" id="rights-filter-control">
             <label for="rights-filter">Rights</label>
             <select id="rights-filter">
               <option value="all">Show all</option>
               <option value="without">Show all without rights</option>
               <option value="with">Show all with rights</option>
+              <option value="misc">Miscellaneous only</option>
+              <option value="entities">Entities only</option>
             </select>
           </div>
           <div class="control role-filter" id="role-filter-control">
@@ -239,6 +246,7 @@
               <th>
                 <button class="sort-button" data-sort="share">Share</button>
               </th>
+              <th class="misc-only">Level</th>
             </tr>
             <tr class="filter-row">
               <th>
@@ -275,6 +283,7 @@
               <th>
                 <select class="filter-select" data-filter="share"></select>
               </th>
+              <th class="misc-only"></th>
             </tr>
             <tr class="bulk-row">
               <th>
@@ -329,6 +338,7 @@
                   <button type="button" class="bulk-apply" data-bulk-apply="share">Set</button>
                 </div>
               </th>
+              <th class="misc-only"></th>
             </tr>
           </thead>
           <tbody></tbody>

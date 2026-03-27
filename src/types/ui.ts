@@ -1,1 +1,1 @@
-export type FilterMode = "role" | "entity";
+export type FilterMode = "role" | "entity" | "misc";

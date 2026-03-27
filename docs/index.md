@@ -1,56 +1,59 @@
-# Security Roles Explorer
+---
+title: Home
+nav_order: 1
+---
 
-Security Roles Explorer is a Power Platform ToolBox (PPTB) tool that helps you review and manage Dataverse security roles, table privileges, and user-role assignments.
+# Advanced Security Roles Explorer
 
-## Install
+**Advanced Security Roles Explorer** is a [Power Platform Tool Box (PPTB)](https://www.powerplatformtoolbox.com/) plugin that gives you full visibility and control over your Dataverse security configuration. From a single interface you can inspect table privileges, assign or remove security roles for users and teams, and review high-level access statistics — without writing a line of code.
 
-1. Open Power Platform ToolBox.
-2. Go to the Tool Gallery.
-3. Search for "Security Roles Explorer".
-4. Install the tool.
+---
 
-## Connect
+## What can you do with this tool?
 
-1. Open the tool.
-2. Select a Dataverse connection in PPTB if prompted.
-3. The tool will load roles, tables, and privileges automatically.
+| Goal | Where to go |
+|---|---|
+| See which tables a role has access to | [Edit Security Roles](edit-security-roles.md) |
+| Compare multiple roles for the same table | [Edit Security Roles](edit-security-roles.md) |
+| Change privilege levels on a role | [Edit Security Roles](edit-security-roles.md) |
+| Assign or remove a role for a user or team | [Assign Security Roles](assign-security-roles.md) |
+| See every role a specific user holds | [Assign Security Roles](assign-security-roles.md) |
+| Get an overview of user counts, role coverage, and teams | [Security Dashboard](security-dashboard.md) |
 
-## Edit Security Roles
+---
 
-Use this tab to view or adjust table privileges.
+## Pages in this documentation
 
-1. Choose a filter mode:
-   - By role: show privileges for a single role.
-   - By entity: compare multiple roles for a single table.
-2. Use the filters or sorting to find the rows you need.
-3. Change privilege levels in the grid.
-4. Click Apply changes to save, or Undo changes to discard.
+- **[Getting Started](getting-started.md)** — Install the tool, connect to your environment, and learn how to navigate between pages.
+- **[Edit Security Roles](edit-security-roles.md)** — Detailed guide to viewing and editing table privileges.
+- **[Assign Security Roles](assign-security-roles.md)** — Step-by-step instructions for assigning and removing roles for users and teams.
+- **[Security Dashboard](security-dashboard.md)** — How to read the dashboard metrics and charts and export the data.
 
-Tips:
-- Use the Rights filter to show only tables with or without rights.
-- In entity mode, use the role filter to include or exclude roles.
+---
 
-## Assign Security Roles
+## Quick start
 
-Use this tab to add or remove roles for users.
+1. Open **Power Platform Tool Box**.
+2. Install **Advanced Security Roles Explorer** from the Tool Gallery.
+3. Open the tool — it connects automatically using your active PPTB connection.
+4. Use the three tabs at the top-right to switch between pages:  
+   **Edit security roles · Assign security roles · Security dashboard**
 
-1. Choose the view:
-   - Role -> Users: see who has a role.
-   - User -> Roles: see roles for a user.
-2. Select users or roles in the list.
-3. Click Add or Remove.
+See [Getting Started](getting-started.md) for a full walkthrough.
 
-## Notes
-
-- Append and Append To are related. You typically need both sides for lookups to work.
-- Changes are applied using Dataverse security APIs and may require appropriate permissions.
+---
 
 ## Troubleshooting
 
-- If the tool shows "Not connected", select a connection in PPTB and reopen the tool.
-- If privileges fail to load, verify the account has security role admin permissions.
-- If changes do not show immediately, reload the tool.
+| Symptom | Solution |
+|---|---|
+| Badge shows "Not connected" | Select a Dataverse connection in PPTB and reopen the tool |
+| Privileges fail to load | Verify the signed-in account has Security Administrator or System Administrator rights |
+| Changes do not appear after applying | Click **Refresh** to reload data from the server |
+| A role is not listed | Enable the **Unmanaged roles only** toggle to show or hide managed (solution) roles |
+
+---
 
 ## Support
 
-If you have issues or suggestions, open a GitHub issue in this repository.
+For bugs or feature requests, open an issue in this GitHub repository.

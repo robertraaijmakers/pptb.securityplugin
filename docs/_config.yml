@@ -1,1 +1,10 @@
 theme: jekyll-theme-cayman
+title: Advanced Security Roles Explorer
+description: A Power Platform Tool Box plugin for viewing and managing Dataverse security roles, user assignments, and access dashboards.
+
+header_pages:
+  - index.md
+  - getting-started.md
+  - edit-security-roles.md
+  - assign-security-roles.md
+  - security-dashboard.md

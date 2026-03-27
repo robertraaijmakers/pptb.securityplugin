@@ -63,3 +63,19 @@ export type PrivilegeInfo = {
   canBeDeep: boolean;
   canBeGlobal: boolean;
 };
+
+export type MiscPrivilegeInfo = {
+  id: string;
+  name: string;
+  label: string;
+  canBeBasic: boolean;
+  canBeLocal: boolean;
+  canBeDeep: boolean;
+  canBeGlobal: boolean;
+};
+
+export type MiscPendingChange = {
+  roleId: string;
+  privilegeId: string;
+  level: PrivilegeLevel;
+};
