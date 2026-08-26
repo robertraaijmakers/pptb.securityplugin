@@ -1,6 +1,6 @@
 {
   "name": "@robertraaijmakers/pptb-securityplugin",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "displayName": "Security Roles Explorer",
   "description": "Be fully in control of your security by quickly viewing and managing which security roles give access to which tables. And who is assigned which security role.",
   "icon": "icon.svg",
@@ -20,6 +20,7 @@
     "security"
   ],
   "homepage": "https://robertraaijmakers.github.io/pptb.securityplugin/",
+  "readme": "https://raw.githubusercontent.com/robertraaijmakers/pptb.securityplugin/main/README.md",
   "repository": {
     "type": "git",
     "url": "https://github.com/robertraaijmakers/pptb.securityplugin/"
