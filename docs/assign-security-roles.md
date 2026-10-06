@@ -160,11 +160,12 @@ Click any **column header button** to sort the table. Click again to reverse the
 When you have finished checking and unchecking rows:
 
 1. Click **Update**.
-2. The tool processes every pending change:
+2. A confirmation dialog shows the target environment, the scope and how many assignments will be added or removed. Choose **Cancel** to go back, **Apply changes** to continue, or **Export current state, then apply** to save a CSV of the current assignments first (a recovery point).
+3. The tool processes every pending change:
    - Checked rows that were previously Not assigned → Dataverse **associate** (role granted).
    - Unchecked rows that were previously Assigned → Dataverse **disassociate** (role removed).
-3. The table refreshes to reflect the confirmed server state.
-4. The pending count badge resets to zero.
+4. The table refreshes to reflect the confirmed server state.
+5. The pending count badge resets to zero.
 
 > **Nothing to update?** If all checkboxes match the current server state the Update button is disabled and the badge is hidden.
 

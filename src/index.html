@@ -513,6 +513,25 @@
         </div>
       </div>
 
+      <div id="confirm-modal" class="modal hidden" aria-hidden="true">
+        <div class="modal-backdrop" id="confirm-modal-backdrop"></div>
+        <div class="modal-content confirm-content" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+          <div class="modal-header">
+            <h3 id="confirm-modal-title">Confirm changes</h3>
+          </div>
+          <div class="confirm-body">
+            <p class="confirm-environment">Target environment: <strong id="confirm-modal-environment"></strong></p>
+            <ul id="confirm-modal-summary"></ul>
+            <p class="confirm-warning">These changes are written to Dataverse immediately and affect who can access data.</p>
+          </div>
+          <div class="confirm-actions">
+            <button type="button" class="btn" id="confirm-modal-cancel">Cancel</button>
+            <button type="button" class="btn" id="confirm-modal-export">Export current state, then apply</button>
+            <button type="button" class="btn primary" id="confirm-modal-apply">Apply changes</button>
+          </div>
+        </div>
+      </div>
+
       <section class="logs">
         <h2>Activity</h2>
         <pre id="log"></pre>

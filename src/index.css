@@ -1231,3 +1231,31 @@ body.theme-dark .misc-section-header td {
 .table-mode-misc thead th:nth-child(n+2):nth-child(-n+10) {
   display: none;
 }
+
+.confirm-content {
+  width: min(560px, 92vw);
+}
+
+.confirm-body {
+  padding: 16px 20px;
+  overflow: auto;
+}
+
+.confirm-body ul {
+  margin: 8px 0 12px;
+  padding-left: 20px;
+}
+
+.confirm-warning {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}

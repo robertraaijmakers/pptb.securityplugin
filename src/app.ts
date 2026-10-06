@@ -341,6 +341,25 @@ const elements = {
   dashboardChartButtons: Array.from(
     document.querySelectorAll(".chart-expand"),
   ) as HTMLButtonElement[],
+  confirmModal: document.getElementById("confirm-modal") as HTMLDivElement,
+  confirmModalEnvironment: document.getElementById(
+    "confirm-modal-environment",
+  ) as HTMLElement,
+  confirmModalSummary: document.getElementById(
+    "confirm-modal-summary",
+  ) as HTMLUListElement,
+  confirmModalCancel: document.getElementById(
+    "confirm-modal-cancel",
+  ) as HTMLButtonElement,
+  confirmModalExport: document.getElementById(
+    "confirm-modal-export",
+  ) as HTMLButtonElement,
+  confirmModalApply: document.getElementById(
+    "confirm-modal-apply",
+  ) as HTMLButtonElement,
+  confirmModalBackdrop: document.getElementById(
+    "confirm-modal-backdrop",
+  ) as HTMLDivElement,
   chartModal: document.getElementById("chart-modal") as HTMLDivElement,
   chartModalTitle: document.getElementById(
     "chart-modal-title",
@@ -3884,8 +3903,154 @@ async function loadAssignmentView() {
   }
 }
 
+type ConfirmRequest = {
+  summary: string[];
+  exportFilename: string;
+  exportRows: string[][];
+};
+
+let confirmResolver: ((confirmed: boolean) => void) | null = null;
+
+function closeConfirmDialog(confirmed: boolean) {
+  elements.confirmModal.classList.add("hidden");
+  elements.confirmModal.setAttribute("aria-hidden", "true");
+  const resolve = confirmResolver;
+  confirmResolver = null;
+  resolve?.(confirmed);
+}
+
+async function exportConfirmSnapshot(request: ConfirmRequest): Promise<boolean> {
+  if (!toolboxAPI?.fileSystem?.saveFile) {
+    await toolboxAPI.utils.showNotification({
+      title: "Export unavailable",
+      body: "Filesystem API is not available in this environment.",
+      type: "error",
+      duration: 3500,
+    });
+    return false;
+  }
+  try {
+    const path = await toolboxAPI.fileSystem.saveFile(
+      request.exportFilename,
+      buildCsv(request.exportRows),
+    );
+    return Boolean(path);
+  } catch (error) {
+    console.error(error);
+    await toolboxAPI.utils.showNotification({
+      title: "Export failed",
+      body: "The current state could not be saved. Changes were not applied.",
+      type: "error",
+      duration: 3500,
+    });
+    return false;
+  }
+}
+
+async function confirmSecurityChange(request: ConfirmRequest): Promise<boolean> {
+  const connection = await getActiveConnection();
+  elements.confirmModalEnvironment.textContent = connection
+    ? `${connection.name} (${connection.environment})`
+    : UI_TEXT.connectionNotConnected;
+  elements.confirmModalSummary.innerHTML = "";
+  for (const line of request.summary) {
+    const item = document.createElement("li");
+    item.textContent = line;
+    elements.confirmModalSummary.appendChild(item);
+  }
+  elements.confirmModal.classList.remove("hidden");
+  elements.confirmModal.setAttribute("aria-hidden", "false");
+  elements.confirmModalCancel.focus();
+
+  elements.confirmModalExport.onclick = async () => {
+    elements.confirmModalExport.disabled = true;
+    try {
+      if (await exportConfirmSnapshot(request)) {
+        closeConfirmDialog(true);
+      }
+    } finally {
+      elements.confirmModalExport.disabled = false;
+    }
+  };
+
+  return new Promise<boolean>((resolve) => {
+    confirmResolver = resolve;
+  });
+}
+
+function buildAssignmentConfirmRequest(): ConfirmRequest | null {
+  const roleNameOf = (rootId: string) =>
+    state.roles.find((role) => role.id === rootId)?.name ?? rootId;
+  const entries: Array<{ target: string; role: string; assign: boolean }> = [];
+  let scope = "";
+
+  if (state.assignmentMode === "role" || state.assignmentMode === "role-team") {
+    const roleRootId = elements.assignmentRoleSelect.value;
+    if (!roleRootId) {
+      return null;
+    }
+    const role = roleNameOf(roleRootId);
+    const isTeam = state.assignmentMode === "role-team";
+    const list = isTeam ? state.teams : state.users;
+    for (const [id, assign] of state.assignmentPendingById) {
+      const target = list.find((item) => item.id === id);
+      if (target) {
+        entries.push({ target: target.name, role, assign });
+      }
+    }
+    scope = `role "${role}"`;
+  } else {
+    const isUser = state.assignmentMode === "user";
+    const targetId = isUser
+      ? elements.assignmentUserSelect.value
+      : elements.assignmentTeamSelect.value;
+    const target = (isUser ? state.users : state.teams).find(
+      (item) => item.id === targetId,
+    );
+    if (!target) {
+      return null;
+    }
+    for (const [rootId, assign] of state.assignmentPendingById) {
+      entries.push({ target: target.name, role: roleNameOf(rootId), assign });
+    }
+    scope = `${isUser ? "user" : "team"} "${target.name}"`;
+  }
+
+  if (entries.length === 0) {
+    return null;
+  }
+  const added = entries.filter((entry) => entry.assign).length;
+  const removed = entries.length - added;
+  const summary = [`Scope: ${scope}`];
+  if (added > 0) {
+    summary.push(`${added} role assignment(s) will be added`);
+  }
+  if (removed > 0) {
+    summary.push(`${removed} role assignment(s) will be removed`);
+  }
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  return {
+    summary,
+    exportFilename: `security-roles-assignments-before-${timestamp}.csv`,
+    exportRows: [
+      ["Target", "Role", "Current state", "New state"],
+      ...entries.map((entry) => [
+        entry.target,
+        entry.role,
+        entry.assign ? "Not assigned" : "Assigned",
+        entry.assign ? "Assigned" : "Not assigned",
+      ]),
+    ],
+  };
+}
+
 async function applyAssignmentUpdates() {
   if (state.assignmentPendingById.size === 0) {
+    return;
+  }
+
+  const confirmRequest = buildAssignmentConfirmRequest();
+  if (!confirmRequest || !(await confirmSecurityChange(confirmRequest))) {
     return;
   }
 
@@ -4062,7 +4227,6 @@ async function applyChanges() {
     return;
   }
 
-  logMessage(formatApplyingChanges(totalChanges));
   const removesByRole = new Map<string, string[]>();
   const addsByRole = new Map<
     string,
@@ -4136,6 +4300,62 @@ async function applyChanges() {
       });
     }
   }
+
+  const roleNameOf = (roleId: string) =>
+    state.roles.find((role) => role.id === roleId)?.name ?? roleId;
+  const exportRows: string[][] = [
+    ["Role", "Table / privilege", "Access right", "Current level", "New level"],
+  ];
+  for (const change of state.pendingChanges) {
+    const current =
+      state.rolePrivileges.get(change.roleId)?.get(change.entityLogicalName)?.[
+        change.privilege
+      ] ?? "none";
+    if (current === change.level) {
+      continue;
+    }
+    exportRows.push([
+      roleNameOf(change.roleId),
+      change.entityLogicalName,
+      change.privilege,
+      mapPrivilegeDepthLabel(current),
+      mapPrivilegeDepthLabel(change.level),
+    ]);
+  }
+  for (const change of state.miscPendingChanges) {
+    const current =
+      state.miscRolePrivileges.get(change.roleId)?.get(change.privilegeId) ??
+      "none";
+    if (current === change.level) {
+      continue;
+    }
+    const miscInfo = state.miscPrivileges.find((m) => m.id === change.privilegeId);
+    exportRows.push([
+      roleNameOf(change.roleId),
+      miscInfo?.name ?? change.privilegeId,
+      "miscellaneous",
+      mapPrivilegeDepthLabel(current),
+      mapPrivilegeDepthLabel(change.level),
+    ]);
+  }
+  const affectedRoleIds = new Set([...removesByRole.keys(), ...addsByRole.keys()]);
+  const privilegeChangeCount = exportRows.length - 1;
+  if (privilegeChangeCount === 0) {
+    return;
+  }
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const confirmed = await confirmSecurityChange({
+    summary: [
+      `${privilegeChangeCount} privilege change(s) across ${affectedRoleIds.size} security role(s)`,
+      `Roles: ${Array.from(affectedRoleIds).map(roleNameOf).join(", ")}`,
+    ],
+    exportFilename: `security-roles-privileges-before-${timestamp}.csv`,
+    exportRows,
+  });
+  if (!confirmed) {
+    return;
+  }
+  logMessage(formatApplyingChanges(totalChanges));
 
   const totalRemoveCalls = Array.from(removesByRole.values()).reduce(
     (total, privilegeIds) => total + privilegeIds.length,
@@ -4486,6 +4706,15 @@ function wireEvents() {
     });
   }
 
+  elements.confirmModalCancel.addEventListener("click", () =>
+    closeConfirmDialog(false),
+  );
+  elements.confirmModalBackdrop.addEventListener("click", () =>
+    closeConfirmDialog(false),
+  );
+  elements.confirmModalApply.addEventListener("click", () =>
+    closeConfirmDialog(true),
+  );
   if (elements.chartModalClose) {
     elements.chartModalClose.addEventListener("click", () => {
       closeDashboardChartModal();
