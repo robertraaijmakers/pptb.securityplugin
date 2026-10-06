@@ -189,6 +189,7 @@ const state = {
   eventsHooked: false,
   readyToastShown: false,
   refreshInProgress: false,
+  privilegeViewRequestToken: 0,
   loading: {
     active: false,
     loaded: 0,
@@ -3725,20 +3726,21 @@ async function ensureSecurityCacheLoaded(
 }
 
 async function refreshPrivilegeView() {
+  const requestToken = ++state.privilegeViewRequestToken;
   if (state.filterMode === "role") {
     const roleId = elements.roleSelect.value;
     if (roleId) {
-      await loadRolePrivileges(roleId);
+      await loadRolePrivileges(roleId, requestToken);
     }
   } else if (state.filterMode === "entity") {
     const entityLogicalName = elements.entitySelect.value;
     if (entityLogicalName) {
-      await loadEntityCoverage(entityLogicalName);
+      await loadEntityCoverage(entityLogicalName, requestToken);
     }
   } else if (state.filterMode === "misc") {
     const miscId = elements.miscSelect.value;
     if (miscId) {
-      await loadMiscCoverageView(miscId);
+      await loadMiscCoverageView(miscId, requestToken);
     }
   }
 }
@@ -3753,9 +3755,12 @@ function renderMiscSelectOptions() {
   );
 }
 
-async function loadMiscCoverageView(privilegeId: string) {
+async function loadMiscCoverageView(
+  privilegeId: string,
+  requestToken = ++state.privilegeViewRequestToken,
+) {
   const loaded = await ensureSecurityCacheLoaded();
-  if (!loaded) {
+  if (!loaded || requestToken !== state.privilegeViewRequestToken) {
     return;
   }
   if (state.miscPrivileges.length > 0 && elements.miscSelect.options.length === 0) {
@@ -3788,9 +3793,12 @@ async function loadMiscCoverageView(privilegeId: string) {
   setTableTitle(formatPrivilegesForMiscTitle(miscInfo?.label ?? privilegeId));
 }
 
-async function loadRolePrivileges(roleId: string) {
+async function loadRolePrivileges(
+  roleId: string,
+  requestToken = ++state.privilegeViewRequestToken,
+) {
   const loaded = await ensureSecurityCacheLoaded();
-  if (!loaded) {
+  if (!loaded || requestToken !== state.privilegeViewRequestToken) {
     return;
   }
   state.tableMode = "role";
@@ -3837,9 +3845,12 @@ async function loadRolePrivileges(roleId: string) {
   setTableTitle(formatPrivilegesForRoleTitle(roleName));
 }
 
-async function loadEntityCoverage(entityLogicalName: string) {
+async function loadEntityCoverage(
+  entityLogicalName: string,
+  requestToken = ++state.privilegeViewRequestToken,
+) {
   const loaded = await ensureSecurityCacheLoaded();
-  if (!loaded) {
+  if (!loaded || requestToken !== state.privilegeViewRequestToken) {
     return;
   }
   state.tableMode = "entity";
