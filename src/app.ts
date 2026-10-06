@@ -4656,12 +4656,14 @@ function wireEvents() {
   elements.filterMode.addEventListener("change", async () => {
     const mode = elements.filterMode.value as FilterMode;
     setFilterMode(mode);
-    if (mode === "misc") {
-      const loaded = await ensureSecurityCacheLoaded();
-      if (loaded && elements.miscSelect.options.length === 0) {
-        renderMiscSelectOptions();
-      }
+    const loaded = await ensureSecurityCacheLoaded();
+    if (!loaded || state.filterMode !== mode) {
+      return;
     }
+    if (mode === "misc" && elements.miscSelect.options.length === 0) {
+      renderMiscSelectOptions();
+    }
+    await refreshPrivilegeView();
   });
   elements.roleSelect.addEventListener("change", () => {
     if (state.filterMode === "role") {
