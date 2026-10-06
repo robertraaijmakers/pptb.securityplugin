@@ -527,8 +527,8 @@ body.theme-dark .btn:not(:disabled):hover {
   border-radius: var(--radius);
   border: 1px solid var(--border);
   box-shadow: 0 8px 24px var(--shadow);
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  /* clip (not auto) so the panel is not a scroll container and sticky table headers follow the page scroll */
+  overflow-x: clip;
   position: relative;
   min-height: 420px;
 }
@@ -595,7 +595,7 @@ body.theme-dark .btn:not(:disabled):hover {
 }
 
 .assignment-table {
-  overflow-x: auto;
+  overflow-x: clip;
 }
 
 .assignment-table .table tbody td {
@@ -1258,4 +1258,13 @@ body.theme-dark .misc-section-header td {
   padding: 12px 20px 16px;
   border-top: 1px solid var(--border);
   flex-wrap: wrap;
+}
+
+/* Keep the column header row visible while scrolling long lists */
+#privileges-table thead tr:first-child th,
+#assignment-table thead tr:first-child th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--panel);
 }
