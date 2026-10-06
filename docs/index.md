@@ -50,7 +50,7 @@ See [Getting Started](getting-started.md) for a full walkthrough.
 | Badge shows "Not connected" | Select a Dataverse connection in PPTB and reopen the tool |
 | Privileges fail to load | Verify the signed-in account has Security Administrator or System Administrator rights |
 | Changes do not appear after applying | Click **Refresh** to reload data from the server |
-| A role is not listed | Enable the **Unmanaged roles only** toggle to show or hide managed (solution) roles |
+| A role is not listed | Enable the **Unmanaged only** toggle to show or hide managed (solution) roles |
 
 ---
 

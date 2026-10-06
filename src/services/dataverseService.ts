@@ -1,4 +1,4 @@
-import { RoleSummary } from "../types/securityRole";
+import { RoleSummary, SolutionSummary } from "../types/securityRole";
 import { UserSummary } from "../types/systemUser";
 import { TeamSummary } from "../types/team";
 import { BusinessUnitSummary, DashboardUser, TeamMembership } from "../types/dashboard";
@@ -56,6 +56,34 @@ export async function loadRoles(hideManagedRoles: boolean): Promise<RoleSummary[
 
   return Array.from(rootRoles.values()).sort((a, b) =>
     a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+  );
+}
+
+export const SOLUTION_COMPONENT_ENTITY = 1;
+export const SOLUTION_COMPONENT_ROLE = 20;
+
+export async function loadSolutions(): Promise<SolutionSummary[]> {
+  const rows = await queryAll(
+    "solutions?$select=solutionid,friendlyname,uniquename&$filter=isvisible eq true&$orderby=friendlyname asc",
+  );
+  return rows.map((row) => ({
+    id: row.solutionid,
+    name: row.friendlyname ?? row.uniquename,
+    uniqueName: row.uniquename,
+  }));
+}
+
+export async function loadSolutionComponentIds(
+  solutionId: string,
+  componentType: number,
+): Promise<Set<string>> {
+  const rows = await queryAll(
+    `solutioncomponents?$select=objectid&$filter=_solutionid_value eq ${solutionId} and componenttype eq ${componentType}`,
+  );
+  return new Set(
+    rows
+      .map((row) => String(row.objectid ?? "").toLowerCase())
+      .filter((id) => id),
   );
 }
 

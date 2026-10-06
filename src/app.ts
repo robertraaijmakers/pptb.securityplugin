@@ -9,6 +9,10 @@ import {
   queryAll,
   retrieveRolePrivileges,
   loadRoles as fetchRoles,
+  loadSolutions as fetchSolutions,
+  loadSolutionComponentIds,
+  SOLUTION_COMPONENT_ENTITY,
+  SOLUTION_COMPONENT_ROLE,
   loadUsers as fetchUsers,
   loadTeams as fetchTeams,
   loadBusinessUnits,
@@ -33,6 +37,7 @@ import {
   PrivilegeRow,
   RoleSummary,
   EntitySummary,
+  SolutionSummary,
   PendingChange,
   PrivilegeInfo,
   MiscPrivilegeInfo,
@@ -106,6 +111,13 @@ const state = {
   selectedRoleIds: new Set<string>(),
   roleFilterSearch: "",
   hideManagedRoles: false,
+  solutions: [] as SolutionSummary[],
+  selectedSolutionId: "",
+  solutionRolesOnly: true,
+  solutionTablesOnly: true,
+  solutionRoleIds: new Set<string>(),
+  solutionEntityIds: new Set<string>(),
+  allEntities: [] as EntitySummary[],
   currentTab: "privileges" as "privileges" | "assignments" | "dashboard",
   rightsFilter: "all" as "all" | "with" | "without" | "misc" | "entities",
   cacheLoaded: false,
@@ -227,6 +239,13 @@ const elements = {
   roleFilterClearAll: document.getElementById(
     "role-filter-clear-all",
   ) as HTMLButtonElement,
+  solutionSelect: document.getElementById("solution-select") as HTMLSelectElement,
+  solutionRolesOnly: document.getElementById(
+    "solution-roles-only",
+  ) as HTMLInputElement,
+  solutionTablesOnly: document.getElementById(
+    "solution-tables-only",
+  ) as HTMLInputElement,
   rolesCustomOnlyGlobal: document.getElementById(
     "roles-custom-only-global",
   ) as HTMLInputElement,
@@ -341,6 +360,25 @@ const elements = {
   dashboardChartButtons: Array.from(
     document.querySelectorAll(".chart-expand"),
   ) as HTMLButtonElement[],
+  confirmModal: document.getElementById("confirm-modal") as HTMLDivElement,
+  confirmModalEnvironment: document.getElementById(
+    "confirm-modal-environment",
+  ) as HTMLElement,
+  confirmModalSummary: document.getElementById(
+    "confirm-modal-summary",
+  ) as HTMLUListElement,
+  confirmModalCancel: document.getElementById(
+    "confirm-modal-cancel",
+  ) as HTMLButtonElement,
+  confirmModalExport: document.getElementById(
+    "confirm-modal-export",
+  ) as HTMLButtonElement,
+  confirmModalApply: document.getElementById(
+    "confirm-modal-apply",
+  ) as HTMLButtonElement,
+  confirmModalBackdrop: document.getElementById(
+    "confirm-modal-backdrop",
+  ) as HTMLDivElement,
   chartModal: document.getElementById("chart-modal") as HTMLDivElement,
   chartModalTitle: document.getElementById(
     "chart-modal-title",
@@ -434,6 +472,7 @@ type SearchableSelectInstance = {
 
 const searchableSelectInstances = new Map<string, SearchableSelectInstance>();
 const searchableSelectIds = [
+  "solution-select",
   "role-select",
   "entity-select",
   "misc-select",
@@ -857,10 +896,127 @@ async function setCustomRolesOnly(enabled: boolean, silent = false) {
   applyRoleFilterToUi();
 }
 
+function isSolutionFilterActive(): boolean {
+  return Boolean(state.selectedSolutionId);
+}
+
 function getFilteredRoles(): RoleSummary[] {
-  return state.hideManagedRoles
-    ? state.allRoles.filter((role) => !role.isManaged)
-    : [...state.allRoles];
+  return state.allRoles.filter((role) => {
+    if (state.hideManagedRoles && role.isManaged) {
+      return false;
+    }
+    if (isSolutionFilterActive() && state.solutionRolesOnly) {
+      return state.solutionRoleIds.has(role.id.toLowerCase());
+    }
+    return true;
+  });
+}
+
+function getFilteredEntities(): EntitySummary[] {
+  if (!isSolutionFilterActive() || !state.solutionTablesOnly) {
+    return [...state.allEntities];
+  }
+  return state.allEntities.filter(
+    (entity) =>
+      entity.metadataId &&
+      state.solutionEntityIds.has(entity.metadataId.toLowerCase()),
+  );
+}
+
+function applyEntityFilterToUi() {
+  state.entities = getFilteredEntities();
+  renderSelectOptionsWithSelection(
+    elements.entitySelect,
+    state.entities,
+    (item) => item.logicalName,
+    (item) => item.displayName,
+    (item) => `${item.displayName} ${item.logicalName}`,
+  );
+  if (
+    state.entities.length > 0 &&
+    !state.entities.some((item) => item.logicalName === elements.entitySelect.value)
+  ) {
+    elements.entitySelect.selectedIndex = 0;
+  }
+  refreshSearchableSelect(elements.entitySelect);
+}
+
+async function loadSolutionFilterData() {
+  try {
+    state.solutions = await fetchSolutions();
+  } catch (error) {
+    console.error(error);
+    state.solutions = [];
+  }
+  if (!state.solutions.some((item) => item.id === state.selectedSolutionId)) {
+    state.selectedSolutionId = "";
+  }
+  elements.solutionSelect.innerHTML = "";
+  const allOption = document.createElement("option");
+  allOption.value = "";
+  allOption.textContent = UI_TEXT.solutionAll;
+  elements.solutionSelect.appendChild(allOption);
+  for (const solution of state.solutions) {
+    const option = document.createElement("option");
+    option.value = solution.id;
+    option.textContent = solution.name;
+    setOptionSearchText(option, `${solution.name} ${solution.uniqueName}`);
+    elements.solutionSelect.appendChild(option);
+  }
+  elements.solutionSelect.value = state.selectedSolutionId;
+  refreshSearchableSelect(elements.solutionSelect);
+  await loadSolutionComponents();
+  updateSolutionToggles();
+}
+
+async function loadSolutionComponents() {
+  state.solutionRoleIds = new Set();
+  state.solutionEntityIds = new Set();
+  if (!state.selectedSolutionId) {
+    return;
+  }
+  try {
+    const [roleIds, entityIds] = await Promise.all([
+      loadSolutionComponentIds(state.selectedSolutionId, SOLUTION_COMPONENT_ROLE),
+      loadSolutionComponentIds(state.selectedSolutionId, SOLUTION_COMPONENT_ENTITY),
+    ]);
+    state.solutionRoleIds = roleIds;
+    state.solutionEntityIds = entityIds;
+  } catch (error) {
+    console.error(error);
+    state.selectedSolutionId = "";
+    elements.solutionSelect.value = "";
+    refreshSearchableSelect(elements.solutionSelect);
+    logMessage(UI_TEXT.logSolutionLoadFailed);
+  }
+}
+
+function updateSolutionToggles() {
+  const enabled = isSolutionFilterActive();
+  elements.solutionRolesOnly.checked = state.solutionRolesOnly;
+  elements.solutionTablesOnly.checked = state.solutionTablesOnly;
+  elements.solutionRolesOnly.disabled = !enabled;
+  elements.solutionTablesOnly.disabled = !enabled;
+  for (const input of [elements.solutionRolesOnly, elements.solutionTablesOnly]) {
+    input.closest(".toggle-option")?.classList.toggle("disabled", !enabled);
+  }
+}
+
+function applySolutionFilterToUi() {
+  updateSolutionToggles();
+  applyEntityFilterToUi();
+  applyRoleFilterToUi();
+}
+
+async function setSelectedSolution(solutionId: string) {
+  state.selectedSolutionId = solutionId;
+  setLoading(true, UI_TEXT.loadingSolutionComponents);
+  try {
+    await loadSolutionComponents();
+  } finally {
+    setLoading(false);
+  }
+  applySolutionFilterToUi();
 }
 
 function applyRoleFilterToUi() {
@@ -1929,6 +2085,13 @@ function renderPrivilegeTable() {
       );
       const effectiveLevel = pendingChange?.level ?? misc.level;
 
+      if (state.rightsFilter === "with" && effectiveLevel === "none") {
+        return false;
+      }
+      if (state.rightsFilter === "without" && effectiveLevel !== "none") {
+        return false;
+      }
+
       if (state.privilegeSearch) {
         const term = state.privilegeSearch.toLowerCase();
         if (
@@ -2113,22 +2276,18 @@ async function loadEntities() {
     "LogicalName",
     "DisplayName",
     "OwnershipType",
+    "MetadataId",
   ]);
-  state.entities = response.value
+  state.allEntities = response.value
     .filter((entity: any) => entity.LogicalName)
     .map((entity: any) => ({
       logicalName: entity.LogicalName,
       displayName:
         entity.DisplayName?.UserLocalizedLabel?.Label ?? entity.LogicalName,
       ownershipLabel: mapOwnershipLabel(entity.OwnershipType),
+      metadataId: entity.MetadataId,
     }));
-  renderSelectOptions(
-    elements.entitySelect,
-    state.entities,
-    (item) => item.logicalName,
-    (item) => item.displayName,
-    (item) => `${item.displayName} ${item.logicalName}`,
-  );
+  applyEntityFilterToUi();
 }
 
 async function loadUsers() {
@@ -3684,7 +3843,7 @@ async function loadEntityCoverage(entityLogicalName: string) {
     return;
   }
   state.tableMode = "entity";
-  const entityLabel = state.entities.find(
+  const entityLabel = state.allEntities.find(
     (entity) => entity.logicalName === entityLogicalName,
   )?.displayName;
   const visibleRoles = state.roles.filter((role) =>
@@ -3884,8 +4043,154 @@ async function loadAssignmentView() {
   }
 }
 
+type ConfirmRequest = {
+  summary: string[];
+  exportFilename: string;
+  exportRows: string[][];
+};
+
+let confirmResolver: ((confirmed: boolean) => void) | null = null;
+
+function closeConfirmDialog(confirmed: boolean) {
+  elements.confirmModal.classList.add("hidden");
+  elements.confirmModal.setAttribute("aria-hidden", "true");
+  const resolve = confirmResolver;
+  confirmResolver = null;
+  resolve?.(confirmed);
+}
+
+async function exportConfirmSnapshot(request: ConfirmRequest): Promise<boolean> {
+  if (!toolboxAPI?.fileSystem?.saveFile) {
+    await toolboxAPI.utils.showNotification({
+      title: "Export unavailable",
+      body: "Filesystem API is not available in this environment.",
+      type: "error",
+      duration: 3500,
+    });
+    return false;
+  }
+  try {
+    const path = await toolboxAPI.fileSystem.saveFile(
+      request.exportFilename,
+      buildCsv(request.exportRows),
+    );
+    return Boolean(path);
+  } catch (error) {
+    console.error(error);
+    await toolboxAPI.utils.showNotification({
+      title: "Export failed",
+      body: "The current state could not be saved. Changes were not applied.",
+      type: "error",
+      duration: 3500,
+    });
+    return false;
+  }
+}
+
+async function confirmSecurityChange(request: ConfirmRequest): Promise<boolean> {
+  const connection = await getActiveConnection();
+  elements.confirmModalEnvironment.textContent = connection
+    ? `${connection.name} (${connection.environment})`
+    : UI_TEXT.connectionNotConnected;
+  elements.confirmModalSummary.innerHTML = "";
+  for (const line of request.summary) {
+    const item = document.createElement("li");
+    item.textContent = line;
+    elements.confirmModalSummary.appendChild(item);
+  }
+  elements.confirmModal.classList.remove("hidden");
+  elements.confirmModal.setAttribute("aria-hidden", "false");
+  elements.confirmModalCancel.focus();
+
+  elements.confirmModalExport.onclick = async () => {
+    elements.confirmModalExport.disabled = true;
+    try {
+      if (await exportConfirmSnapshot(request)) {
+        closeConfirmDialog(true);
+      }
+    } finally {
+      elements.confirmModalExport.disabled = false;
+    }
+  };
+
+  return new Promise<boolean>((resolve) => {
+    confirmResolver = resolve;
+  });
+}
+
+function buildAssignmentConfirmRequest(): ConfirmRequest | null {
+  const roleNameOf = (rootId: string) =>
+    state.roles.find((role) => role.id === rootId)?.name ?? rootId;
+  const entries: Array<{ target: string; role: string; assign: boolean }> = [];
+  let scope = "";
+
+  if (state.assignmentMode === "role" || state.assignmentMode === "role-team") {
+    const roleRootId = elements.assignmentRoleSelect.value;
+    if (!roleRootId) {
+      return null;
+    }
+    const role = roleNameOf(roleRootId);
+    const isTeam = state.assignmentMode === "role-team";
+    const list = isTeam ? state.teams : state.users;
+    for (const [id, assign] of state.assignmentPendingById) {
+      const target = list.find((item) => item.id === id);
+      if (target) {
+        entries.push({ target: target.name, role, assign });
+      }
+    }
+    scope = `role "${role}"`;
+  } else {
+    const isUser = state.assignmentMode === "user";
+    const targetId = isUser
+      ? elements.assignmentUserSelect.value
+      : elements.assignmentTeamSelect.value;
+    const target = (isUser ? state.users : state.teams).find(
+      (item) => item.id === targetId,
+    );
+    if (!target) {
+      return null;
+    }
+    for (const [rootId, assign] of state.assignmentPendingById) {
+      entries.push({ target: target.name, role: roleNameOf(rootId), assign });
+    }
+    scope = `${isUser ? "user" : "team"} "${target.name}"`;
+  }
+
+  if (entries.length === 0) {
+    return null;
+  }
+  const added = entries.filter((entry) => entry.assign).length;
+  const removed = entries.length - added;
+  const summary = [`Scope: ${scope}`];
+  if (added > 0) {
+    summary.push(`${added} role assignment(s) will be added`);
+  }
+  if (removed > 0) {
+    summary.push(`${removed} role assignment(s) will be removed`);
+  }
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  return {
+    summary,
+    exportFilename: `security-roles-assignments-before-${timestamp}.csv`,
+    exportRows: [
+      ["Target", "Role", "Current state", "New state"],
+      ...entries.map((entry) => [
+        entry.target,
+        entry.role,
+        entry.assign ? "Not assigned" : "Assigned",
+        entry.assign ? "Assigned" : "Not assigned",
+      ]),
+    ],
+  };
+}
+
 async function applyAssignmentUpdates() {
   if (state.assignmentPendingById.size === 0) {
+    return;
+  }
+
+  const confirmRequest = buildAssignmentConfirmRequest();
+  if (!confirmRequest || !(await confirmSecurityChange(confirmRequest))) {
     return;
   }
 
@@ -4062,7 +4367,6 @@ async function applyChanges() {
     return;
   }
 
-  logMessage(formatApplyingChanges(totalChanges));
   const removesByRole = new Map<string, string[]>();
   const addsByRole = new Map<
     string,
@@ -4136,6 +4440,62 @@ async function applyChanges() {
       });
     }
   }
+
+  const roleNameOf = (roleId: string) =>
+    state.roles.find((role) => role.id === roleId)?.name ?? roleId;
+  const exportRows: string[][] = [
+    ["Role", "Table / privilege", "Access right", "Current level", "New level"],
+  ];
+  for (const change of state.pendingChanges) {
+    const current =
+      state.rolePrivileges.get(change.roleId)?.get(change.entityLogicalName)?.[
+        change.privilege
+      ] ?? "none";
+    if (current === change.level) {
+      continue;
+    }
+    exportRows.push([
+      roleNameOf(change.roleId),
+      change.entityLogicalName,
+      change.privilege,
+      mapPrivilegeDepthLabel(current),
+      mapPrivilegeDepthLabel(change.level),
+    ]);
+  }
+  for (const change of state.miscPendingChanges) {
+    const current =
+      state.miscRolePrivileges.get(change.roleId)?.get(change.privilegeId) ??
+      "none";
+    if (current === change.level) {
+      continue;
+    }
+    const miscInfo = state.miscPrivileges.find((m) => m.id === change.privilegeId);
+    exportRows.push([
+      roleNameOf(change.roleId),
+      miscInfo?.name ?? change.privilegeId,
+      "miscellaneous",
+      mapPrivilegeDepthLabel(current),
+      mapPrivilegeDepthLabel(change.level),
+    ]);
+  }
+  const affectedRoleIds = new Set([...removesByRole.keys(), ...addsByRole.keys()]);
+  const privilegeChangeCount = exportRows.length - 1;
+  if (privilegeChangeCount === 0) {
+    return;
+  }
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const confirmed = await confirmSecurityChange({
+    summary: [
+      `${privilegeChangeCount} privilege change(s) across ${affectedRoleIds.size} security role(s)`,
+      `Roles: ${Array.from(affectedRoleIds).map(roleNameOf).join(", ")}`,
+    ],
+    exportFilename: `security-roles-privileges-before-${timestamp}.csv`,
+    exportRows,
+  });
+  if (!confirmed) {
+    return;
+  }
+  logMessage(formatApplyingChanges(totalChanges));
 
   const totalRemoveCalls = Array.from(removesByRole.values()).reduce(
     (total, privilegeIds) => total + privilegeIds.length,
@@ -4226,6 +4586,7 @@ async function refreshData() {
   setLoading(true, UI_TEXT.loadingRolesMetadata);
 
   try {
+    await loadSolutionFilterData();
     await Promise.all([loadRoles(true), loadEntities()]);
     setTableTitle(UI_TEXT.tableTitlePrivileges);
 
@@ -4268,6 +4629,9 @@ async function initialize() {
       toolboxAPI.events.on((event: any, payload: any) => {
         if (payload.event === "connection:updated") {
           refreshData();
+        }
+        if (payload.event === "settings:updated") {
+          applyTheme().catch((error) => console.error(error));
         }
       });
       state.eventsHooked = true;
@@ -4398,6 +4762,18 @@ function wireEvents() {
     });
   }
 
+  elements.solutionSelect.addEventListener("change", () => {
+    setSelectedSolution(elements.solutionSelect.value);
+  });
+  elements.solutionRolesOnly.addEventListener("change", () => {
+    state.solutionRolesOnly = elements.solutionRolesOnly.checked;
+    applySolutionFilterToUi();
+  });
+  elements.solutionTablesOnly.addEventListener("change", () => {
+    state.solutionTablesOnly = elements.solutionTablesOnly.checked;
+    applySolutionFilterToUi();
+  });
+
   if (elements.rolesCustomOnlyGlobal) {
     elements.rolesCustomOnlyGlobal.addEventListener("change", () => {
       setCustomRolesOnly(elements.rolesCustomOnlyGlobal.checked);
@@ -4486,6 +4862,15 @@ function wireEvents() {
     });
   }
 
+  elements.confirmModalCancel.addEventListener("click", () =>
+    closeConfirmDialog(false),
+  );
+  elements.confirmModalBackdrop.addEventListener("click", () =>
+    closeConfirmDialog(false),
+  );
+  elements.confirmModalApply.addEventListener("click", () =>
+    closeConfirmDialog(true),
+  );
   if (elements.chartModalClose) {
     elements.chartModalClose.addEventListener("click", () => {
       closeDashboardChartModal();

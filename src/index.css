@@ -94,8 +94,7 @@ body.theme-dark .table tbody tr:hover {
 
 .header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
   gap: 16px;
   background: var(--panel);
   padding: 20px 24px;
@@ -103,11 +102,36 @@ body.theme-dark .table tbody tr:hover {
   box-shadow: 0 10px 30px var(--shadow);
 }
 
-.header-actions {
+.header-top {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  justify-content: space-between;
+  align-items: flex-start;
   gap: 16px;
+}
+
+.header-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.header-info {
+  flex-shrink: 0;
+}
+
+.header-info .badge {
+  white-space: nowrap;
+}
+
+.header-title h1 {
+  margin-top: 0;
+}
+
+.header-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 16px;
 }
 
 .header-info {
@@ -527,8 +551,8 @@ body.theme-dark .btn:not(:disabled):hover {
   border-radius: var(--radius);
   border: 1px solid var(--border);
   box-shadow: 0 8px 24px var(--shadow);
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  /* clip (not auto) so the panel is not a scroll container and sticky table headers follow the page scroll */
+  overflow-x: clip;
   position: relative;
   min-height: 420px;
 }
@@ -595,7 +619,7 @@ body.theme-dark .btn:not(:disabled):hover {
 }
 
 .assignment-table {
-  overflow-x: auto;
+  overflow-x: clip;
 }
 
 .assignment-table .table tbody td {
@@ -1230,4 +1254,65 @@ body.theme-dark .misc-section-header td {
 
 .table-mode-misc thead th:nth-child(n+2):nth-child(-n+10) {
   display: none;
+}
+
+.confirm-content {
+  width: min(560px, 92vw);
+}
+
+.confirm-body {
+  padding: 16px 20px;
+  overflow: auto;
+}
+
+.confirm-body ul {
+  margin: 8px 0 12px;
+  padding-left: 20px;
+}
+
+.confirm-warning {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+/* Keep the column header row visible while scrolling long lists */
+#privileges-table thead tr:first-child th,
+#assignment-table thead tr:first-child th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--panel);
+}
+
+.header-filter-solution {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  border-radius: 18px;
+}
+
+.header-filter-solution {
+  gap: 8px;
+}
+
+.header-filter-solution .searchable-select {
+  min-width: 150px;
+}
+
+.toggle-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-option.disabled {
+  opacity: 0.5;
 }

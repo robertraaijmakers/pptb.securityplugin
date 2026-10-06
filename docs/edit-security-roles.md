@@ -142,8 +142,9 @@ The pending count badge (e.g. **3**) shows the total number of individual privil
 When you are satisfied with all changes:
 
 1. Click **Apply changes**.
-2. The tool sends all changed cells to the Dataverse API in a single batch operation.
-3. The table reloads with the confirmed server state.
+2. A confirmation dialog shows the target environment, the number of privilege changes and the roles affected. Choose **Cancel** to go back, **Apply changes** to continue, or **Export current state, then apply** to save a CSV of the current privilege levels first (a recovery point).
+3. The tool sends all changed cells to the Dataverse API.
+4. The table reloads with the confirmed server state.
 
 ### Undoing changes
 

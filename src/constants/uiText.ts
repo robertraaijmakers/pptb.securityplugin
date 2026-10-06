@@ -1,5 +1,9 @@
 export const UI_TEXT = {
   loadingWorking: "Working...",
+  loadingSolutionComponents: "Loading solution components",
+  solutionAll: "All solutions",
+  logSolutionLoadFailed:
+    "Could not load solution components; solution filter cleared.",
   loadingRolesMetadata: "Loading roles and metadata",
   loadingRolePrivileges: "Loading role privileges",
   loadingRefreshingPrivileges: "Refreshing role privileges",
