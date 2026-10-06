@@ -1948,6 +1948,13 @@ function renderPrivilegeTable() {
       );
       const effectiveLevel = pendingChange?.level ?? misc.level;
 
+      if (state.rightsFilter === "with" && effectiveLevel === "none") {
+        return false;
+      }
+      if (state.rightsFilter === "without" && effectiveLevel !== "none") {
+        return false;
+      }
+
       if (state.privilegeSearch) {
         const term = state.privilegeSearch.toLowerCase();
         if (
