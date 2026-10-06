@@ -54,8 +54,8 @@
     "publish:stable": "npm publish --access public"
   },
   "devDependencies": {
-    "@pptb/types": "1.2.0",
-    "esbuild": "0.27.3",
+    "@pptb/types": "1.2.6",
+    "esbuild": "0.28.2",
     "typescript": "^5.4.5"
   },
   "dependencies": {
