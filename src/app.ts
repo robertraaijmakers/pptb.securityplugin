@@ -4496,6 +4496,9 @@ async function initialize() {
         if (payload.event === "connection:updated") {
           refreshData();
         }
+        if (payload.event === "settings:updated") {
+          applyTheme().catch((error) => console.error(error));
+        }
       });
       state.eventsHooked = true;
     }
