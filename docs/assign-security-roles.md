@@ -177,4 +177,4 @@ When you have finished checking and unchecking rows:
 - **Use "Without assigned" role filter for onboarding.** Filtering the role dropdown to "Without assigned" quickly surfaces roles that have no users yet — useful when setting up a new environment.
 - **Use "Without assigned roles" user filter for audits.** Filtering the user dropdown to "Without assigned roles" shows users who hold no roles at all, which may indicate they cannot do anything useful in the system.
 - **Use Role → Teams for automated flows.** If you use Power Automate flows or application users, they are often members of teams rather than assigned roles directly. Use Role → Teams mode to manage team-level assignments.
-- **Unmanaged roles only toggle.** When this is on, managed roles are hidden from the second dropdown. This is convenient when you only want to work with your own custom roles.
+- **Unmanaged only toggle.** When this is on, managed roles are hidden from the second dropdown. This is convenient when you only want to work with your own custom roles.

@@ -9,11 +9,11 @@
   <body>
     <div id="app">
       <header class="header">
-        <div>
-          <h1>Advanced Security Roles Explorer</h1>
-          <p class="subtitle">Be fully in control of your security by quickly viewing and managing which security roles give access to which tables. And who is assigned which security role.</p>
-        </div>
-        <div class="header-actions">
+        <div class="header-top">
+          <div class="header-title">
+            <h1>Advanced Security Roles Explorer</h1>
+            <p class="subtitle">Be fully in control of your security by quickly viewing and managing which security roles give access to which tables. And who is assigned which security role.</p>
+          </div>
           <div class="header-info">
             <div id="connection-badge" class="badge">Not connected</div>
             <button type="button" id="theme-toggle" class="btn theme-toggle" aria-label="Toggle theme">
@@ -33,21 +33,22 @@
               </svg>
             </button>
           </div>
+        </div>
+        <div class="header-bottom">
           <nav class="tabs">
             <button class="tab-button active" data-tab="privileges">Edit security roles</button>
             <button class="tab-button" data-tab="assignments">Assign security roles</button>
             <button class="tab-button" data-tab="dashboard">Security dashboard</button>
           </nav>
-          <div class="header-filter">
-            <label class="toggle" for="roles-custom-only-global">
-              <input type="checkbox" id="roles-custom-only-global" />
-              <span class="toggle-track"></span>
-            </label>
-            <span class="toggle-label">Unmanaged roles only</span>
-          </div>
           <div class="header-filter header-filter-solution">
-            <span class="toggle-label">Solution</span>
-            <select id="solution-select" aria-label="Solution">
+            <span class="toggle-option">
+              <label class="toggle" for="roles-custom-only-global">
+                <input type="checkbox" id="roles-custom-only-global" />
+                <span class="toggle-track"></span>
+              </label>
+              <span class="toggle-label" title="Hide managed roles; show unmanaged (custom) roles only">Unmanaged only</span>
+            </span>
+            <select id="solution-select" aria-label="Solution" title="Filter by solution">
               <option value="">All solutions</option>
             </select>
             <span class="toggle-option disabled">
@@ -55,14 +56,14 @@
                 <input type="checkbox" id="solution-roles-only" checked disabled />
                 <span class="toggle-track"></span>
               </label>
-              <span class="toggle-label">Roles in solution only</span>
+              <span class="toggle-label" title="Show roles in this solution only">Roles in solution</span>
             </span>
             <span class="toggle-option disabled">
               <label class="toggle" for="solution-tables-only">
                 <input type="checkbox" id="solution-tables-only" checked disabled />
                 <span class="toggle-track"></span>
               </label>
-              <span class="toggle-label">Tables in solution only</span>
+              <span class="toggle-label" title="Show tables in this solution only">Tables in solution</span>
             </span>
           </div>
         </div>

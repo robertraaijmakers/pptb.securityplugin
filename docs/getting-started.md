@@ -42,10 +42,8 @@ The tool uses the active connection that is selected in PPTB. It does not ask yo
 ## The header
 
 ```
-Advanced Security Roles Explorer
-[Connection badge]  [Theme toggle]
-[Edit security roles] [Assign security roles] [Security dashboard]
-[Unmanaged roles only  ●]
+Advanced Security Roles Explorer                      [Connection badge] [Theme toggle]
+[Edit security roles] [Assign security roles] [Security dashboard]   [Unmanaged only ●] [Solution ▾] [Roles in solution ●] [Tables in solution ●]
 ```
 
 | Element | What it does |
@@ -53,7 +51,7 @@ Advanced Security Roles Explorer
 | **Connection badge** | Displays the name of the currently connected environment |
 | **Theme toggle** | Switches between light and dark mode |
 | **Tab bar** | Switches between the three main pages |
-| **Unmanaged roles only** toggle | When enabled, hides managed (solution-deployed) roles across all pages and shows only custom (unmanaged) roles |
+| **Unmanaged only** toggle | When enabled, hides managed (solution-deployed) roles across all pages and shows only custom (unmanaged) roles |
 | **Solution** filter | Limits roles and/or tables to the components of a chosen solution (see below) |
 
 ---
@@ -76,7 +74,7 @@ Click any tab button to switch pages instantly. Your filters and unsaved changes
 
 ## Unmanaged roles only
 
-The **Unmanaged roles only** toggle in the header applies globally to all three pages. When switched on:
+The **Unmanaged only** toggle in the header applies globally to all three pages. When switched on:
 
 - Managed roles (roles that are part of a solution, such as Dynamics 365 built-in roles) are hidden from all dropdowns and tables.
 - Only roles you have created directly in the environment (custom / unmanaged) remain visible.
@@ -91,10 +89,10 @@ The **Solution** picker in the header limits the tool to the contents of one sol
 
 Once a solution is selected, two toggles decide what is filtered, and you can switch each on or off independently:
 
-- **Roles in solution only** – only security roles that are part of the solution appear in role dropdowns, tables and dashboard filters.
-- **Tables in solution only** – only tables that are part of the solution appear in the table dropdown and in the privilege grid.
+- **Roles in solution** – only security roles that are part of the solution appear in role dropdowns, tables and dashboard filters.
+- **Tables in solution** – only tables that are part of the solution appear in the table dropdown and in the privilege grid.
 
-The solution filter combines with **Unmanaged roles only**. Solutions are loaded when the tool starts and on **Refresh**.
+The solution filter combines with **Unmanaged only**. Solutions are loaded when the tool starts and on **Refresh**.
 
 ---
 
