@@ -12,6 +12,7 @@ Security Roles Explorer provides administrators with a focused interface to:
 - Edit privileges individually or in bulk
 - Assign and unassign roles for users and teams
 - Review security posture in a dashboard with key metrics
+- Focus on a single solution by showing only its roles and/or tables
 
 ## Features
 

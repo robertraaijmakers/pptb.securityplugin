@@ -9,6 +9,10 @@ import {
   queryAll,
   retrieveRolePrivileges,
   loadRoles as fetchRoles,
+  loadSolutions as fetchSolutions,
+  loadSolutionComponentIds,
+  SOLUTION_COMPONENT_ENTITY,
+  SOLUTION_COMPONENT_ROLE,
   loadUsers as fetchUsers,
   loadTeams as fetchTeams,
   loadBusinessUnits,
@@ -33,6 +37,7 @@ import {
   PrivilegeRow,
   RoleSummary,
   EntitySummary,
+  SolutionSummary,
   PendingChange,
   PrivilegeInfo,
   MiscPrivilegeInfo,
@@ -106,6 +111,13 @@ const state = {
   selectedRoleIds: new Set<string>(),
   roleFilterSearch: "",
   hideManagedRoles: false,
+  solutions: [] as SolutionSummary[],
+  selectedSolutionId: "",
+  solutionRolesOnly: true,
+  solutionTablesOnly: true,
+  solutionRoleIds: new Set<string>(),
+  solutionEntityIds: new Set<string>(),
+  allEntities: [] as EntitySummary[],
   currentTab: "privileges" as "privileges" | "assignments" | "dashboard",
   rightsFilter: "all" as "all" | "with" | "without" | "misc" | "entities",
   cacheLoaded: false,
@@ -227,6 +239,13 @@ const elements = {
   roleFilterClearAll: document.getElementById(
     "role-filter-clear-all",
   ) as HTMLButtonElement,
+  solutionSelect: document.getElementById("solution-select") as HTMLSelectElement,
+  solutionRolesOnly: document.getElementById(
+    "solution-roles-only",
+  ) as HTMLInputElement,
+  solutionTablesOnly: document.getElementById(
+    "solution-tables-only",
+  ) as HTMLInputElement,
   rolesCustomOnlyGlobal: document.getElementById(
     "roles-custom-only-global",
   ) as HTMLInputElement,
@@ -453,6 +472,7 @@ type SearchableSelectInstance = {
 
 const searchableSelectInstances = new Map<string, SearchableSelectInstance>();
 const searchableSelectIds = [
+  "solution-select",
   "role-select",
   "entity-select",
   "misc-select",
@@ -876,10 +896,127 @@ async function setCustomRolesOnly(enabled: boolean, silent = false) {
   applyRoleFilterToUi();
 }
 
+function isSolutionFilterActive(): boolean {
+  return Boolean(state.selectedSolutionId);
+}
+
 function getFilteredRoles(): RoleSummary[] {
-  return state.hideManagedRoles
-    ? state.allRoles.filter((role) => !role.isManaged)
-    : [...state.allRoles];
+  return state.allRoles.filter((role) => {
+    if (state.hideManagedRoles && role.isManaged) {
+      return false;
+    }
+    if (isSolutionFilterActive() && state.solutionRolesOnly) {
+      return state.solutionRoleIds.has(role.id.toLowerCase());
+    }
+    return true;
+  });
+}
+
+function getFilteredEntities(): EntitySummary[] {
+  if (!isSolutionFilterActive() || !state.solutionTablesOnly) {
+    return [...state.allEntities];
+  }
+  return state.allEntities.filter(
+    (entity) =>
+      entity.metadataId &&
+      state.solutionEntityIds.has(entity.metadataId.toLowerCase()),
+  );
+}
+
+function applyEntityFilterToUi() {
+  state.entities = getFilteredEntities();
+  renderSelectOptionsWithSelection(
+    elements.entitySelect,
+    state.entities,
+    (item) => item.logicalName,
+    (item) => item.displayName,
+    (item) => `${item.displayName} ${item.logicalName}`,
+  );
+  if (
+    state.entities.length > 0 &&
+    !state.entities.some((item) => item.logicalName === elements.entitySelect.value)
+  ) {
+    elements.entitySelect.selectedIndex = 0;
+  }
+  refreshSearchableSelect(elements.entitySelect);
+}
+
+async function loadSolutionFilterData() {
+  try {
+    state.solutions = await fetchSolutions();
+  } catch (error) {
+    console.error(error);
+    state.solutions = [];
+  }
+  if (!state.solutions.some((item) => item.id === state.selectedSolutionId)) {
+    state.selectedSolutionId = "";
+  }
+  elements.solutionSelect.innerHTML = "";
+  const allOption = document.createElement("option");
+  allOption.value = "";
+  allOption.textContent = UI_TEXT.solutionAll;
+  elements.solutionSelect.appendChild(allOption);
+  for (const solution of state.solutions) {
+    const option = document.createElement("option");
+    option.value = solution.id;
+    option.textContent = solution.name;
+    setOptionSearchText(option, `${solution.name} ${solution.uniqueName}`);
+    elements.solutionSelect.appendChild(option);
+  }
+  elements.solutionSelect.value = state.selectedSolutionId;
+  refreshSearchableSelect(elements.solutionSelect);
+  await loadSolutionComponents();
+  updateSolutionToggles();
+}
+
+async function loadSolutionComponents() {
+  state.solutionRoleIds = new Set();
+  state.solutionEntityIds = new Set();
+  if (!state.selectedSolutionId) {
+    return;
+  }
+  try {
+    const [roleIds, entityIds] = await Promise.all([
+      loadSolutionComponentIds(state.selectedSolutionId, SOLUTION_COMPONENT_ROLE),
+      loadSolutionComponentIds(state.selectedSolutionId, SOLUTION_COMPONENT_ENTITY),
+    ]);
+    state.solutionRoleIds = roleIds;
+    state.solutionEntityIds = entityIds;
+  } catch (error) {
+    console.error(error);
+    state.selectedSolutionId = "";
+    elements.solutionSelect.value = "";
+    refreshSearchableSelect(elements.solutionSelect);
+    logMessage(UI_TEXT.logSolutionLoadFailed);
+  }
+}
+
+function updateSolutionToggles() {
+  const enabled = isSolutionFilterActive();
+  elements.solutionRolesOnly.checked = state.solutionRolesOnly;
+  elements.solutionTablesOnly.checked = state.solutionTablesOnly;
+  elements.solutionRolesOnly.disabled = !enabled;
+  elements.solutionTablesOnly.disabled = !enabled;
+  for (const input of [elements.solutionRolesOnly, elements.solutionTablesOnly]) {
+    input.closest(".toggle-option")?.classList.toggle("disabled", !enabled);
+  }
+}
+
+function applySolutionFilterToUi() {
+  updateSolutionToggles();
+  applyEntityFilterToUi();
+  applyRoleFilterToUi();
+}
+
+async function setSelectedSolution(solutionId: string) {
+  state.selectedSolutionId = solutionId;
+  setLoading(true, UI_TEXT.loadingSolutionComponents);
+  try {
+    await loadSolutionComponents();
+  } finally {
+    setLoading(false);
+  }
+  applySolutionFilterToUi();
 }
 
 function applyRoleFilterToUi() {
@@ -2139,22 +2276,18 @@ async function loadEntities() {
     "LogicalName",
     "DisplayName",
     "OwnershipType",
+    "MetadataId",
   ]);
-  state.entities = response.value
+  state.allEntities = response.value
     .filter((entity: any) => entity.LogicalName)
     .map((entity: any) => ({
       logicalName: entity.LogicalName,
       displayName:
         entity.DisplayName?.UserLocalizedLabel?.Label ?? entity.LogicalName,
       ownershipLabel: mapOwnershipLabel(entity.OwnershipType),
+      metadataId: entity.MetadataId,
     }));
-  renderSelectOptions(
-    elements.entitySelect,
-    state.entities,
-    (item) => item.logicalName,
-    (item) => item.displayName,
-    (item) => `${item.displayName} ${item.logicalName}`,
-  );
+  applyEntityFilterToUi();
 }
 
 async function loadUsers() {
@@ -3710,7 +3843,7 @@ async function loadEntityCoverage(entityLogicalName: string) {
     return;
   }
   state.tableMode = "entity";
-  const entityLabel = state.entities.find(
+  const entityLabel = state.allEntities.find(
     (entity) => entity.logicalName === entityLogicalName,
   )?.displayName;
   const visibleRoles = state.roles.filter((role) =>
@@ -4453,6 +4586,7 @@ async function refreshData() {
   setLoading(true, UI_TEXT.loadingRolesMetadata);
 
   try {
+    await loadSolutionFilterData();
     await Promise.all([loadRoles(true), loadEntities()]);
     setTableTitle(UI_TEXT.tableTitlePrivileges);
 
@@ -4627,6 +4761,18 @@ function wireEvents() {
       setTheme(isDark ? "light" : "dark");
     });
   }
+
+  elements.solutionSelect.addEventListener("change", () => {
+    setSelectedSolution(elements.solutionSelect.value);
+  });
+  elements.solutionRolesOnly.addEventListener("change", () => {
+    state.solutionRolesOnly = elements.solutionRolesOnly.checked;
+    applySolutionFilterToUi();
+  });
+  elements.solutionTablesOnly.addEventListener("change", () => {
+    state.solutionTablesOnly = elements.solutionTablesOnly.checked;
+    applySolutionFilterToUi();
+  });
 
   if (elements.rolesCustomOnlyGlobal) {
     elements.rolesCustomOnlyGlobal.addEventListener("change", () => {

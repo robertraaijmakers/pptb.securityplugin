@@ -1268,3 +1268,23 @@ body.theme-dark .misc-section-header td {
   z-index: 2;
   background: var(--panel);
 }
+
+.header-filter-solution {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  border-radius: 18px;
+}
+
+.header-filter-solution .searchable-select {
+  min-width: 220px;
+}
+
+.toggle-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-option.disabled {
+  opacity: 0.5;
+}

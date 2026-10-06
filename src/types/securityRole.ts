@@ -43,6 +43,13 @@ export type EntitySummary = {
   logicalName: string;
   displayName: string;
   ownershipLabel: string;
+  metadataId?: string;
+};
+
+export type SolutionSummary = {
+  id: string;
+  name: string;
+  uniqueName: string;
 };
 
 export type PendingChange = {

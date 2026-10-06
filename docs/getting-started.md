@@ -54,6 +54,7 @@ Advanced Security Roles Explorer
 | **Theme toggle** | Switches between light and dark mode |
 | **Tab bar** | Switches between the three main pages |
 | **Unmanaged roles only** toggle | When enabled, hides managed (solution-deployed) roles across all pages and shows only custom (unmanaged) roles |
+| **Solution** filter | Limits roles and/or tables to the components of a chosen solution (see below) |
 
 ---
 
@@ -81,6 +82,19 @@ The **Unmanaged roles only** toggle in the header applies globally to all three 
 - Only roles you have created directly in the environment (custom / unmanaged) remain visible.
 
 This is useful when you only want to manage your own custom roles and do not want the built-in roles cluttering the lists.
+
+---
+
+## Solution filter
+
+The **Solution** picker in the header limits the tool to the contents of one solution. Choose a solution to filter all three pages; choose **All solutions** to switch the filter off.
+
+Once a solution is selected, two toggles decide what is filtered, and you can switch each on or off independently:
+
+- **Roles in solution only** – only security roles that are part of the solution appear in role dropdowns, tables and dashboard filters.
+- **Tables in solution only** – only tables that are part of the solution appear in the table dropdown and in the privilege grid.
+
+The solution filter combines with **Unmanaged roles only**. Solutions are loaded when the tool starts and on **Refresh**.
 
 ---
 
