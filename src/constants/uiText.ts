@@ -6,6 +6,7 @@ export const UI_TEXT = {
     "Could not load solution components; solution filter cleared.",
   loadingRolesMetadata: "Loading roles and metadata",
   loadingRolePrivileges: "Loading role privileges",
+  loadingEntityPrivileges: "Loading roles for table",
   loadingRefreshingPrivileges: "Refreshing role privileges",
   loadingApplyingChanges: "Applying privilege changes",
   loadingDashboardData: "Loading dashboard data",
@@ -63,6 +64,10 @@ export const UI_TEXT = {
 };
 
 export const NOTIFICATIONS = {
+  entityPrivilegesFailed: {
+    title: "Table privileges failed",
+    body: "Could not retrieve roles for this table. See Activity for details.",
+  },
   noChanges: {
     title: "No changes",
     body: "There are no pending privilege updates.",

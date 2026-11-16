@@ -1187,13 +1187,26 @@ body.theme-dark .level-select.pending-change {
   background: var(--panel);
   border-radius: var(--radius);
   border: 1px solid var(--border);
+  min-width: 0;
+}
+
+.logs summary {
   padding: 16px 20px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 24px;
+  cursor: pointer;
 }
 
 .logs pre {
   font-family: var(--mono);
   font-size: 12px;
   margin: 0;
+  padding: 0 20px 16px;
+  max-height: calc(100vh - 78px);
+  max-height: calc(100dvh - 78px);
+  overflow: auto;
+  overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 

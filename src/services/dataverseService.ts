@@ -1,4 +1,4 @@
-import { RoleSummary, SolutionSummary } from "../types/securityRole";
+import { PrivilegeInfo, RoleSummary, SolutionSummary } from "../types/securityRole";
 import { UserSummary } from "../types/systemUser";
 import { TeamSummary } from "../types/team";
 import { BusinessUnitSummary, DashboardUser, TeamMembership } from "../types/dashboard";
@@ -29,6 +29,118 @@ export async function queryAll(odataQuery: string) {
   }
 
   return all;
+}
+
+function escapeXml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;",
+  })[character]!);
+}
+
+async function fetchAllEntityPrivileges(entityXml: string, operationLabel: string) {
+  const rows: Record<string, unknown>[] = [];
+  const pageSize = 5000;
+  let page = 1;
+  let pagingCookie = "";
+  while (true) {
+    const cookieAttribute = pagingCookie
+      ? ` paging-cookie="${escapeXml(pagingCookie)}"` : "";
+    const fetchXml = `<fetch count="${pageSize}" page="${page}"${cookieAttribute}>${entityXml}</fetch>`;
+    const response: DataverseAPI.FetchXmlResult = await dataverseAPI.fetchXmlQuery(fetchXml);
+    if (!Array.isArray(response?.value)) {
+      throw new Error(`${operationLabel}: expected a FetchXML value array.`);
+    }
+    const cookie = response["@Microsoft.Dynamics.CRM.fetchxmlpagingcookie"];
+    rows.push(...response.value);
+    if (!cookie && response.value.length < pageSize) {
+      return rows;
+    }
+    pagingCookie = "";
+    if (cookie) {
+      const document = new DOMParser().parseFromString(cookie, "text/xml");
+      if (document.querySelector("parsererror")) {
+        throw new Error(`${operationLabel}: invalid FetchXML paging cookie.`);
+      }
+      const encodedCookie = document.documentElement.getAttribute("pagingcookie");
+      pagingCookie = encodedCookie
+        ? decodeURIComponent(decodeURIComponent(encodedCookie)) : cookie;
+    }
+    page += 1;
+  }
+}
+
+export async function loadEntityRolePrivileges(
+  entityLogicalName: string,
+  isActivity: boolean,
+): Promise<{
+  definitions: PrivilegeInfo[];
+  grants: Array<{ roleId: string; privilegeId: string; depthMask: number }>;
+}> {
+  const tableName = isActivity || entityLogicalName === "activitypointer"
+    ? "Activity" : entityLogicalName === "annotation" ? "Note" : entityLogicalName;
+  const privilegeNames = [
+    "Read", "Write", "Append", "AppendTo", "Create", "Delete", "Share", "Assign",
+  ].map((right) => `prv${right}${tableName}`);
+  const nameFilter = `<filter><condition attribute="name" operator="in">${
+    privilegeNames.map((name) => `<value>${escapeXml(name)}</value>`).join("")
+  }</condition></filter>`;
+  const definitionXml = `<entity name="privilege">
+    <attribute name="privilegeid"/><attribute name="privilegerowid"/>
+    <attribute name="name"/><attribute name="accessright"/><attribute name="ismanaged"/>
+    <attribute name="canbebasic"/><attribute name="canbelocal"/>
+    <attribute name="canbedeep"/><attribute name="canbeglobal"/>
+    <order attribute="privilegeid"/>${nameFilter}
+  </entity>`;
+  const grantXml = `<entity name="roleprivileges">
+    <attribute name="privilegedepthmask" alias="DepthMask"/>
+    <order attribute="roleid"/><order attribute="privilegeid"/>
+    <link-entity name="privilege" from="privilegeid" to="privilegeid">
+      <attribute name="privilegeid" />${nameFilter}
+    </link-entity>
+    <link-entity name="role" from="roleid" to="roleid">
+      <attribute name="roleid" />
+    </link-entity>
+  </entity>`;
+  const requireString = (row: Record<string, unknown>, key: string): string => {
+    const value = row[key];
+    if (typeof value !== "string" || !value) {
+      throw new Error(`Entity privileges: missing or invalid ${key}.`);
+    }
+    return value;
+  };
+  const [definitions, grants] = await Promise.all([
+    fetchAllEntityPrivileges(definitionXml, "Entity privilege definitions"),
+    fetchAllEntityPrivileges(grantXml, "Entity role grants"),
+  ]);
+  return {
+    definitions: definitions.map((row) => {
+      if (typeof row.accessright !== "number") {
+        throw new Error("Entity privileges: missing or invalid accessright.");
+      }
+      return {
+        id: requireString(row, "privilegeid"),
+        rowId: typeof row.privilegerowid === "string" ? row.privilegerowid : null,
+        name: requireString(row, "name"),
+        accessRight: row.accessright,
+        isManaged: Boolean(row.ismanaged),
+        canBeBasic: Boolean(row.canbebasic),
+        canBeLocal: Boolean(row.canbelocal),
+        canBeDeep: Boolean(row.canbedeep),
+        canBeGlobal: Boolean(row.canbeglobal),
+      };
+    }),
+    grants: grants.map((row) => {
+      const depthMask = row.DepthMask;
+      if (typeof depthMask !== "number" || ![0, 1, 2, 4, 8].includes(depthMask)) {
+        throw new Error("Entity privileges: invalid privilegedepthmask.");
+      }
+      return {
+        roleId: requireString(row, "roleid"),
+        privilegeId: requireString(row, "privilegeid"),
+        depthMask,
+      };
+    }),
+  };
 }
 
 export async function loadRoles(hideManagedRoles: boolean): Promise<RoleSummary[]> {

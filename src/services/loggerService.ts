@@ -11,3 +11,4 @@ export function logMessage(message: string) {
   const timestamp = new Date().toLocaleTimeString();
   logTarget.textContent = `[${timestamp}] ${message}\n${logTarget.textContent}`;
 }
+

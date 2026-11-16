@@ -44,6 +44,7 @@ export type EntitySummary = {
   displayName: string;
   ownershipLabel: string;
   metadataId?: string;
+  isActivity?: boolean;
 };
 
 export type SolutionSummary = {
