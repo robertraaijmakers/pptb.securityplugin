@@ -19,6 +19,7 @@ Security Roles Explorer provides administrators with a focused interface to:
 ### PRIVILEGE EXPLORER
 
 - View privileges by role or by table
+- Identify tables by **Display Name (logicalname)** in the entity dropdown and table listing
 - Sort and filter by access rights and ownership
 - Bulk update visible rows for a selected privilege column
 - Track pending privilege changes before applying
@@ -55,6 +56,7 @@ Nothing is written to Dataverse until you click **Apply changes** / **Update** a
 - If the tool shows "Not connected", select a connection in ToolBox and reload.
 - If role privileges fail to load, verify the connection user has required security permissions and refresh.
 - If assignments look stale after changes, refresh data from the toolbar.
+- Expand **Activity** to review operation messages and errors. Click its heading to collapse it; long output scrolls within a panel limited to the window height. Verbose request/response traces are not recorded.
 
 ## License
 

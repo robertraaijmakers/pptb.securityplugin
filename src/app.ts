@@ -8,6 +8,7 @@ import {
   dataverseAPI,
   queryAll,
   retrieveRolePrivileges,
+  loadEntityRolePrivileges,
   loadRoles as fetchRoles,
   loadSolutions as fetchSolutions,
   loadSolutionComponentIds,
@@ -121,6 +122,7 @@ const state = {
   currentTab: "privileges" as "privileges" | "assignments" | "dashboard",
   rightsFilter: "all" as "all" | "with" | "without" | "misc" | "entities",
   cacheLoaded: false,
+  entityCoverageLoaded: false,
   cacheLoading: false,
   cachePromise: null as Promise<boolean> | null,
   assignmentMode: "role" as AssignmentMode,
@@ -689,7 +691,9 @@ function setTableTitle(text: string) {
 }
 
 function resetSecurityCache(clearPending: boolean) {
+  state.privilegeViewRequestToken += 1;
   state.cacheLoaded = false;
+  state.entityCoverageLoaded = false;
   state.privilegeIdByKey = new Map();
   state.privilegeInfoById = new Map();
   state.rolePrivileges = new Map();
@@ -930,7 +934,7 @@ function applyEntityFilterToUi() {
     elements.entitySelect,
     state.entities,
     (item) => item.logicalName,
-    (item) => item.displayName,
+    (item) => `${item.displayName} (${item.logicalName})`,
     (item) => `${item.displayName} ${item.logicalName}`,
   );
   if (
@@ -1055,7 +1059,7 @@ function applyRoleFilterToUi() {
     elements.roleSelect.value = state.roles[0].id;
     refreshSearchableSelect(elements.roleSelect);
   }
-  if (state.cacheLoaded) {
+  if (hasPrivilegeViewData()) {
     if (state.filterMode === "entity" && state.entities.length > 0) {
       loadEntityCoverage(elements.entitySelect.value);
     } else if (state.filterMode === "misc" && elements.miscSelect.value) {
@@ -1074,9 +1078,13 @@ function applyRoleFilterToUi() {
   }
 }
 
+function hasPrivilegeViewData(): boolean {
+  return state.filterMode === "entity" ? state.entityCoverageLoaded : state.cacheLoaded;
+}
+
 function setLoading(active: boolean, message?: string) {
   state.loading.active = active;
-  const hasLoadedData = state.cacheLoaded;
+  const hasLoadedData = hasPrivilegeViewData();
   if (elements.tableLoading) {
     elements.tableLoading.classList.toggle("hidden", !active);
   }
@@ -1982,7 +1990,7 @@ function renderPrivilegeTable() {
   renderBulkControls(rows, isRoleMode);
 
   if (elements.tableEmpty) {
-    elements.tableEmpty.classList.toggle("hidden", state.cacheLoaded);
+    elements.tableEmpty.classList.toggle("hidden", hasPrivilegeViewData());
   }
 
   if (tableElement) {
@@ -1993,7 +2001,9 @@ function renderPrivilegeTable() {
     const tr = document.createElement("tr");
     const entityCell = document.createElement("td");
     const labelSpan = document.createElement("span");
-    labelSpan.textContent = row.entityLabel;
+    labelSpan.textContent = isRoleMode
+      ? `${row.entityLabel} (${row.entityLogicalName})`
+      : row.entityLabel;
     if (isRoleMode) {
       labelSpan.title = row.entityLogicalName;
     }
@@ -2224,6 +2234,7 @@ function renderPrivilegeTable() {
 }
 
 function setFilterMode(mode: FilterMode) {
+  state.privilegeViewRequestToken += 1;
   state.filterMode = mode;
   const isRole = mode === "role";
   const isEntity = mode === "entity";
@@ -2278,6 +2289,7 @@ async function loadEntities() {
     "DisplayName",
     "OwnershipType",
     "MetadataId",
+    "IsActivity",
   ]);
   state.allEntities = response.value
     .filter((entity: any) => entity.LogicalName)
@@ -2287,6 +2299,7 @@ async function loadEntities() {
         entity.DisplayName?.UserLocalizedLabel?.Label ?? entity.LogicalName,
       ownershipLabel: mapOwnershipLabel(entity.OwnershipType),
       metadataId: entity.MetadataId,
+      isActivity: Boolean(entity.IsActivity),
     }));
   applyEntityFilterToUi();
 }
@@ -3685,6 +3698,21 @@ async function loadSecurityCache(): Promise<boolean> {
     }
   }
 
+  // Keep direct entity baselines and aliases if the role cache is loaded later.
+  for (const [key, id] of state.privilegeIdByKey) {
+    privilegeIdByKey.set(key, id);
+  }
+  for (const [id, info] of state.privilegeInfoById) {
+    privilegeInfoById.set(id, info);
+  }
+  for (const [roleId, entities] of state.rolePrivileges) {
+    const roleMap = rolePrivilegesCache.get(roleId);
+    if (roleMap) {
+      for (const [entityName, record] of entities) {
+        roleMap.set(entityName, record);
+      }
+    }
+  }
   state.privilegeIdByKey = privilegeIdByKey;
   state.privilegeInfoById = privilegeInfoById;
   state.miscPrivileges = miscPrivilegesLocal.sort((a, b) =>
@@ -3742,6 +3770,9 @@ async function refreshPrivilegeView() {
     if (miscId) {
       await loadMiscCoverageView(miscId, requestToken);
     }
+  }
+  if (requestToken === state.privilegeViewRequestToken) {
+    setLoading(false);
   }
 }
 
@@ -3849,49 +3880,90 @@ async function loadEntityCoverage(
   entityLogicalName: string,
   requestToken = ++state.privilegeViewRequestToken,
 ) {
-  const loaded = await ensureSecurityCacheLoaded();
-  if (!loaded || requestToken !== state.privilegeViewRequestToken) {
-    return;
-  }
-  state.tableMode = "entity";
-  const entityLabel = state.allEntities.find(
-    (entity) => entity.logicalName === entityLogicalName,
-  )?.displayName;
-  const visibleRoles = state.roles.filter((role) =>
-    state.selectedRoleIds.has(role.id),
-  );
-  state.privilegeRows = visibleRoles.map((role) => {
-    const record = state.rolePrivileges
-      .get(role.id)
-      ?.get(entityLogicalName) ?? {
-      create: "none",
-      read: "none",
-      write: "none",
-      delete: "none",
-      append: "none",
-      appendto: "none",
-      assign: "none",
-      share: "none",
-    };
-    return {
+  state.entityCoverageLoaded = false;
+  setLoading(true, UI_TEXT.loadingEntityPrivileges);
+  try {
+    // Let an existing role-cache load finish before updating the editing baseline.
+    if (state.cachePromise) {
+      await state.cachePromise;
+    }
+    const entity = state.allEntities.find(
+      (item) => item.logicalName === entityLogicalName,
+    );
+    const { definitions, grants } = await loadEntityRolePrivileges(
+      entityLogicalName, entity?.isActivity ?? false,
+    );
+    if (requestToken !== state.privilegeViewRequestToken) {
+      return;
+    }
+    const accessByPrivilegeId = new Map<string, AccessRight>();
+    for (const definition of definitions) {
+      const parsed = mapAccessFromName(definition.name);
+      if (!parsed) {
+        throw new Error(`Unrecognized table privilege: ${definition.name}`);
+      }
+      accessByPrivilegeId.set(definition.id.toLowerCase(), parsed.access);
+    }
+    const recordsByRole = new Map<string, Record<AccessRight, PrivilegeLevel>>();
+    for (const grant of grants) {
+      const right = accessByPrivilegeId.get(grant.privilegeId.toLowerCase());
+      if (!right) {
+        throw new Error(`Missing definition for table privilege ${grant.privilegeId}`);
+      }
+      const record = ensureRolePrivilegeRecord(recordsByRole, grant.roleId.toLowerCase());
+      record[right] = mapPrivilegeLevel(grant.depthMask);
+    }
+    for (const right of accessRights) {
+      state.privilegeIdByKey.delete(`${entityLogicalName}:${right}`);
+    }
+    for (const definition of definitions) {
+      const right = accessByPrivilegeId.get(definition.id.toLowerCase())!;
+      state.privilegeIdByKey.set(`${entityLogicalName}:${right}`, definition.id);
+      state.privilegeInfoById.set(definition.id, definition);
+    }
+    for (const role of state.allRoles) {
+      let roleMap = state.rolePrivileges.get(role.id);
+      if (!roleMap) {
+        roleMap = new Map();
+        state.rolePrivileges.set(role.id, roleMap);
+      }
+      roleMap.delete(entityLogicalName);
+      const record = recordsByRole.get(role.id.toLowerCase());
+      if (record) {
+        roleMap.set(entityLogicalName, record);
+      }
+    }
+    state.tableMode = "entity";
+    const visibleRoles = state.roles.filter((role) =>
+      state.selectedRoleIds.has(role.id),
+    );
+    state.privilegeRows = visibleRoles.map((role) => ({
       roleId: role.id,
       entityLogicalName,
       entityLabel: role.name,
       ownershipLabel: "",
-      create: record.create,
-      read: record.read,
-      write: record.write,
-      delete: record.delete,
-      append: record.append,
-      appendto: record.appendto,
-      assign: record.assign,
-      share: record.share,
-    };
-  });
-  renderPrivilegeTable();
-  setTableTitle(
-    formatPrivilegesForTableTitle(entityLabel ?? entityLogicalName),
-  );
+      ...ensureRolePrivilegeRecord(recordsByRole, role.id.toLowerCase()),
+    }));
+    state.entityCoverageLoaded = true;
+    renderPrivilegeTable();
+    setTableTitle(
+      formatPrivilegesForTableTitle(entity?.displayName ?? entityLogicalName),
+    );
+  } catch (error) {
+    console.error(error);
+    logMessage(error instanceof Error ? error.message : String(error));
+    if (requestToken === state.privilegeViewRequestToken) {
+      await toolboxAPI.utils.showNotification({
+        ...NOTIFICATIONS.entityPrivilegesFailed,
+        type: "error",
+        duration: 3500,
+      });
+    }
+  } finally {
+    if (requestToken === state.privilegeViewRequestToken) {
+      setLoading(false);
+    }
+  }
 }
 
 async function loadAssignmentView() {
@@ -4667,12 +4739,14 @@ function wireEvents() {
   elements.filterMode.addEventListener("change", async () => {
     const mode = elements.filterMode.value as FilterMode;
     setFilterMode(mode);
-    const loaded = await ensureSecurityCacheLoaded();
-    if (!loaded || state.filterMode !== mode) {
-      return;
-    }
-    if (mode === "misc" && elements.miscSelect.options.length === 0) {
-      renderMiscSelectOptions();
+    if (mode !== "entity") {
+      const loaded = await ensureSecurityCacheLoaded();
+      if (!loaded || state.filterMode !== mode) {
+        return;
+      }
+      if (mode === "misc" && elements.miscSelect.options.length === 0) {
+        renderMiscSelectOptions();
+      }
     }
     await refreshPrivilegeView();
   });
@@ -4750,7 +4824,9 @@ function wireEvents() {
   if (elements.refreshBtn) {
     elements.refreshBtn.addEventListener("click", async () => {
       resetSecurityCache(true);
-      await ensureSecurityCacheLoaded(UI_TEXT.loadingRefreshingPrivileges);
+      if (state.filterMode !== "entity") {
+        await ensureSecurityCacheLoaded(UI_TEXT.loadingRefreshingPrivileges);
+      }
       await refreshPrivilegeView();
     });
   }
@@ -4758,11 +4834,8 @@ function wireEvents() {
     elements.rightsFilter.addEventListener("change", async () => {
       const value = elements.rightsFilter.value as "all" | "with" | "without" | "misc" | "entities";
       state.rightsFilter = value;
-      if (!state.cacheLoaded) {
-        const loaded = await ensureSecurityCacheLoaded();
-        if (loaded) {
-          await refreshPrivilegeView();
-        }
+      if (!hasPrivilegeViewData()) {
+        await refreshPrivilegeView();
         return;
       }
       renderPrivilegeTable();
@@ -5016,11 +5089,8 @@ function wireEvents() {
       state.privilegeSearch = elements.privilegeSearch.value
         .trim()
         .toLowerCase();
-      if (!state.cacheLoaded) {
-        const loaded = await ensureSecurityCacheLoaded();
-        if (loaded) {
-          await refreshPrivilegeView();
-        }
+      if (!hasPrivilegeViewData()) {
+        await refreshPrivilegeView();
         return;
       }
       renderPrivilegeTable();
@@ -5074,11 +5144,8 @@ function wireEvents() {
     select.addEventListener("change", async () => {
       const privilege = select.dataset.filter as AccessRight;
       state.filters[privilege] = select.value;
-      if (!state.cacheLoaded) {
-        const loaded = await ensureSecurityCacheLoaded();
-        if (loaded) {
-          await refreshPrivilegeView();
-        }
+      if (!hasPrivilegeViewData()) {
+        await refreshPrivilegeView();
         return;
       }
       renderPrivilegeTable();

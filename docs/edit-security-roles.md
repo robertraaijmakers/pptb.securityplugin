@@ -62,12 +62,14 @@ The **Filter mode** dropdown lets you choose between two ways of viewing data:
 ### By entity mode
 
 1. Select **By entity** from the Filter mode dropdown.
-2. Choose a table from the **Entity** dropdown.
+2. Choose a table from the **Entity** dropdown. Tables are listed as **Display Name (logicalname)**, for example **Account (account)**.
 3. Use the **Role filter** dropdown (a multi-select) to pick which roles appear as columns. By default all roles are shown.
    - Click **Select filtered** to add all roles matching the current search to the selection.
    - Click **Clear filtered** to remove roles matching the current search.
    - Click **Clear all** to reset the selection to all roles.
 4. The table shows one row per role, with columns for each privilege type.
+
+The **By entity** view retrieves the selected table's role privileges directly from Dataverse. Notes and activity tables use their shared Note/Activity privileges. Existing role selections and display filters still apply, including showing roles without rights. The **By role** view continues to use its existing privilege cache.
 
 ---
 
@@ -77,7 +79,7 @@ The **Filter mode** dropdown lets you choose between two ways of viewing data:
 
 | Column | Description |
 |---|---|
-| **Entity / Role** | Name of the table (by-role mode) or the security role (by-entity mode) |
+| **Entity / Role** | Display name and logical name of the table as **Display Name (logicalname)** (by-role mode), or the security role name (by-entity mode) |
 | **Ownership** | The ownership model of the table: User, Organization, or Team |
 | **Create** | Who can create records: None, User, Business Unit, Parent BU, or Organization |
 | **Read** | Who can read records |
